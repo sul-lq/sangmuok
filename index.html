@@ -403,6 +403,9 @@ function parseInput(){
   if(!raw){preview.innerHTML='<div class="empty">입력하면 미리보기</div>';btn.disabled=true;return;}
   const lines=raw.split(/\n/).map(l=>l.trim()).filter(Boolean);
   let dateKey=currentDateKey,timeStr=null,name=null,people=null,memo=[];
+
+  // 1차: 날짜/시간/인원 먼저 확인
+  const remainLines=[];
   for(const line of lines){
     // 오늘/내일/낼/모레
     if(/^오늘$/.test(line)){dateKey=currentDateKey;continue;}
@@ -414,14 +417,12 @@ function parseInput(){
       const d=new Date(currentDateKey+'T00:00:00');d.setDate(d.getDate()+2);
       dateKey=`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;continue;
     }
-    // 다음주/담주 + 요일 (예: "다음주 금요일", "담주금")
-    const nextWeekMatch = line.match(/^(다음\s*주|담주)\s*([월화수목금토일])요?일?$/);
+    // 다음주/담주 + 요일
+    const nextWeekMatch=line.match(/^(다음\s*주|담주)\s*([월화수목금토일])요?일?$/);
     if(nextWeekMatch){
       const dow=DAY_MAP[nextWeekMatch[2]];
       const d=new Date(currentDateKey+'T00:00:00');
-      let diff=dow-d.getDay();
-      if(diff<=0)diff+=7; // 이번주 같은 요일 포함해서 무조건 다음주
-      diff+=7;
+      let diff=dow-d.getDay();if(diff<=0)diff+=7;diff+=7;
       d.setDate(d.getDate()+diff);
       dateKey=`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;continue;
     }
@@ -432,12 +433,24 @@ function parseInput(){
       d.setDate(d.getDate()+diff);
       dateKey=`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;continue;
     }
+    // 날짜 M/D
     const dm=line.match(/^(\d{1,2})[\/월](\d{1,2})일?$/);
     if(dm){dateKey=`${new Date().getFullYear()}-${dm[1].padStart(2,'0')}-${dm[2].padStart(2,'0')}`;continue;}
-    if(!timeStr&&/\d/.test(line)&&(line.includes('시')||line.includes(':')||line.includes('분뒤')||line.includes('분후')||line.includes('시간뒤')||line.includes('시간후')||/^\d{1,2}$/.test(line))){timeStr=line;continue;}
+    // 시간
+    if(!timeStr&&/\d/.test(line)&&(line.includes('시')||line.includes(':')||line.includes('분뒤')||line.includes('분후')||line.includes('시간뒤')||line.includes('시간후'))){timeStr=line;continue;}
+    // 인원
     if(!people&&/^[\d.\/+]+명?$/.test(line)){people=line.replace('명','');continue;}
-    if(!name&&/^[가-힣a-zA-Z]{1,10}$/.test(line)&&!/^[월화수목금토일]/.test(line)){name=line;continue;}
-    memo.push(line);
+    // 나머지는 이름/메모 후보
+    remainLines.push(line);
+  }
+
+  // 2차: 남은 줄에서 이름/메모 분리
+  // 첫 번째 줄 = 이름, 나머지 = 메모
+  if(remainLines.length>=1){
+    name=remainLines[0];
+    if(remainLines.length>=2){
+      memo=remainLines.slice(1);
+    }
   }
   const errors=[];
   if(!timeStr)errors.push('시간 필요');if(!name)errors.push('예약자명 필요');
@@ -487,12 +500,48 @@ function updateTable(dateKey,slot,id,val){
   if(r){r.table=val;saveToSheet();}
 }
 
-// ── 배치도 데이터 ─────────────────────────────────────
+// ── 룸 → 테이블 매핑 ─────────────────────────────────
+const ROOM_MAP = {
+  '1룸':[31,32], '2룸':[33,34], '3룸':[35,36],
+  '5룸':[41,42], '6룸':[43,44], '7룸':[45,46], '8룸':[47,48],
+  '2층5룸':[51,52,53,54,55,56], '2층6룸':[61,62,63,64],
+  '2층7룸':[71,72,73,74,75,76], '홀':[81,82,83,84],
+  '창가1':[1,2], '창가2':[3,4], '창가3':[5,6], '창가4':[7,8],
+};
+
+// 테이블 값 → 룸명 변환 (배치도 표시용)
+function resolveTableLabel(val){
+  if(!val) return '';
+  const v = val.trim();
+  // 숫자면 그대로
+  if(/^\d+$/.test(v)) return v;
+  // 룸 이름이면 첫 번째 테이블 번호 반환 (배치도 매칭용)
+  for(const [room, tables] of Object.entries(ROOM_MAP)){
+    if(v===room) return String(tables[0]);
+  }
+  return v;
+}
+
+// 배치도에서 테이블 번호 매칭 (룸명 포함)
 function getBookings(tNum){
   const data=reservations[currentDateKey]||{am:[],pm:[]};
   return{
-    am:data.am.filter(r=>String(r.table)===String(tNum)),
-    pm:data.pm.filter(r=>String(r.table)===String(tNum))
+    am:data.am.filter(r=>{
+      const t=String(r.table).trim();
+      if(String(tNum)===t) return true;
+      for(const [room,tables] of Object.entries(ROOM_MAP)){
+        if(t===room && tables.includes(tNum)) return true;
+      }
+      return false;
+    }),
+    pm:data.pm.filter(r=>{
+      const t=String(r.table).trim();
+      if(String(tNum)===t) return true;
+      for(const [room,tables] of Object.entries(ROOM_MAP)){
+        if(t===room && tables.includes(tNum)) return true;
+      }
+      return false;
+    })
   };
 }
 function cellClass(tNum){
