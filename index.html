@@ -2,8 +2,14 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>상무옥 예약관리</title>
+<link rel="manifest" href="./manifest.json">
+<meta name="theme-color" content="#0f0f0f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="상무옥">
+<link rel="apple-touch-icon" href="./icon-192.png">
 <style>
 :root{
   --bg:#0f0f0f;--surface:#1a1a1a;--surface2:#242424;--border:#2e2e2e;
@@ -1207,6 +1213,103 @@ async function autoSync(){
 
 // 15초마다 자동 동기화
 setInterval(autoSync, 15000);
+
+// ── PWA 서비스워커 등록 ───────────────────────────────
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('./service-worker.js').catch(()=>{});
+}
+
+// ── 알림 기능 ─────────────────────────────────────────
+let notifyEnabled = false;
+let prevResCount = countAllReservations();
+let prevChatCount = 0;
+
+function countAllReservations(){
+  let n=0;
+  Object.values(reservations).forEach(s=>{n+=(s.am||[]).length+(s.pm||[]).length;});
+  return n;
+}
+
+// 알림음 (웹오디오로 생성 - 외부 파일 불필요)
+function playNotifySound(){
+  try{
+    const ctx=new (window.AudioContext||window.webkitAudioContext)();
+    const notes=[[880,0],[1175,0.12]]; // 두 음 "딩-동"
+    notes.forEach(([freq,delay])=>{
+      const o=ctx.createOscillator();
+      const g=ctx.createGain();
+      o.connect(g);g.connect(ctx.destination);
+      o.frequency.value=freq;
+      o.type='sine';
+      const t=ctx.currentTime+delay;
+      g.gain.setValueAtTime(0,t);
+      g.gain.linearRampToValueAtTime(0.3,t+0.02);
+      g.gain.exponentialRampToValueAtTime(0.01,t+0.25);
+      o.start(t);o.stop(t+0.3);
+    });
+  }catch(e){}
+}
+
+// 화면 알림 (브라우저 알림 권한 있으면 팝업, 없으면 화면 배너)
+function showNotification(title, body){
+  playNotifySound();
+  if(notifyEnabled && 'Notification' in window && Notification.permission==='granted'){
+    try{ new Notification(title,{body, icon:'./icon-192.png', tag:'sangmuok'}); }catch(e){}
+  }
+  showBanner(title+' '+body);
+}
+
+function showBanner(text){
+  let b=document.getElementById('notify-banner');
+  if(!b){
+    b=document.createElement('div');
+    b.id='notify-banner';
+    b.style.cssText='position:fixed;top:12px;left:50%;transform:translateX(-50%);background:var(--green);color:#000;padding:12px 20px;border-radius:12px;font-size:14px;font-weight:700;z-index:9999;box-shadow:0 6px 24px rgba(0,0,0,.5);max-width:90%;text-align:center;transition:opacity .3s,top .3s;cursor:pointer;';
+    b.onclick=()=>{b.style.opacity='0';};
+    document.body.appendChild(b);
+  }
+  b.textContent='🔔 '+text;
+  b.style.opacity='1';
+  b.style.top='12px';
+  clearTimeout(b._timer);
+  b._timer=setTimeout(()=>{b.style.opacity='0';},4000);
+}
+
+// 알림 권한 요청 (사용자 첫 클릭 시)
+function requestNotifyPermission(){
+  if('Notification' in window && Notification.permission==='default'){
+    Notification.requestPermission().then(p=>{ notifyEnabled=(p==='granted'); });
+  }else if('Notification' in window && Notification.permission==='granted'){
+    notifyEnabled=true;
+  }
+}
+document.addEventListener('click', function once(){
+  requestNotifyPermission();
+  document.removeEventListener('click', once);
+}, {once:true});
+
+// autoSync 후 새 항목 감지해서 알림
+const _origAutoSync = autoSync;
+autoSync = async function(){
+  await _origAutoSync();
+  // 예약 증가 감지
+  const nowRes=countAllReservations();
+  if(nowRes>prevResCount && prevResCount>=0){
+    showNotification('새 예약', `예약이 ${nowRes-prevResCount}건 추가됐어요`);
+  }
+  prevResCount=nowRes;
+  // 채팅 증가 감지
+  if(chatMessages.length>prevChatCount && prevChatCount>0){
+    const last=chatMessages[chatMessages.length-1];
+    if(last.sender!==currentSender){
+      showNotification(last.sender, last.text.slice(0,30));
+    }
+  }
+  prevChatCount=chatMessages.length;
+};
+
+// 초기 채팅 카운트 세팅
+setTimeout(()=>{prevChatCount=chatMessages.length;prevResCount=countAllReservations();},3000);
 </script>
 </body>
 </html>
