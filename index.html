@@ -28,9 +28,37 @@ header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;alig
 .tab.am.active{background:var(--am-dim);border-color:var(--am);color:var(--am);}
 .tab.pm.active{background:var(--pm-dim);border-color:var(--pm);color:var(--pm);}
 .tab.map.active{background:#1a1a2e;border-color:#a78bfa;color:#a78bfa;}
+.tab.chat.active{background:#0a2818;border-color:var(--green);color:var(--green);}
 .tab-badge{display:inline-block;background:var(--surface2);border-radius:10px;padding:1px 6px;font-size:11px;margin-left:5px;font-family:'DM Mono',monospace;}
 .tab.am.active .tab-badge{background:var(--am);color:#000;}
 .tab.pm.active .tab-badge{background:var(--pm);color:#000;}
+
+/* ── 채팅 패널 ── */
+.chat-panel{flex:1;display:none;flex-direction:column;height:100%;}
+.chat-panel.active{display:flex;}
+.chat-messages{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px;}
+.chat-date-divider{text-align:center;font-size:11px;color:var(--text-dim);margin:8px 0;}
+.chat-date-divider span{background:var(--surface2);padding:3px 12px;border-radius:10px;}
+.chat-msg{max-width:75%;align-self:flex-start;background:var(--surface2);border-radius:4px 14px 14px 14px;padding:10px 13px;position:relative;}
+.chat-msg.mine{align-self:flex-end;background:#2a3f2f;border-radius:14px 4px 14px 14px;}
+.chat-msg-sender{font-size:11px;color:var(--am);font-weight:700;margin-bottom:3px;}
+.chat-msg.mine .chat-msg-sender{color:var(--green);}
+.chat-msg-text{font-size:14px;line-height:1.5;white-space:pre-wrap;word-break:break-word;}
+.chat-msg-time{font-size:9px;color:var(--text-dim);margin-top:4px;text-align:right;}
+.chat-msg-parsed{margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,.1);font-size:11px;}
+.chat-parsed-info{color:var(--text-dim);line-height:1.6;}
+.chat-parsed-info b{color:var(--text);}
+.chat-register-btn{margin-top:6px;background:var(--green);color:#000;border:none;border-radius:6px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;width:100%;font-family:'Noto Sans KR',sans-serif;}
+.chat-register-btn.done{background:var(--surface);color:var(--text-dim);cursor:default;}
+.chat-input-bar{border-top:1px solid var(--border);padding:10px 12px;display:flex;gap:8px;align-items:flex-end;background:var(--bg);}
+.chat-input-bar textarea{flex:1;height:auto;min-height:42px;max-height:120px;font-family:'Noto Sans KR',sans-serif;font-size:14px;line-height:1.4;padding:10px 12px;}
+.chat-send-btn{background:var(--green);color:#000;border:none;border-radius:10px;width:46px;height:42px;font-size:18px;cursor:pointer;flex-shrink:0;touch-action:manipulation;}
+.chat-sender-select{display:flex;gap:6px;padding:8px 12px;border-bottom:1px solid var(--border);align-items:center;}
+.chat-sender-select span{font-size:11px;color:var(--text-dim);}
+.chat-sender-btn{background:var(--surface);border:1px solid var(--border);color:var(--text-dim);border-radius:14px;padding:4px 12px;font-size:12px;cursor:pointer;font-family:'Noto Sans KR',sans-serif;}
+.chat-sender-btn.active{background:var(--green);color:#000;border-color:var(--green);font-weight:700;}
+.chat-auto-toggle{margin-left:auto;display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-dim);cursor:pointer;}
+
 
 /* 메인 레이아웃 */
 .main{display:flex;height:calc(100vh - 105px);}
@@ -193,6 +221,7 @@ tbody td{padding:9px 10px;vertical-align:middle;}
     <span id="current-date-label" onclick="openCalendar()" style="cursor:pointer;border-bottom:1px dashed #555;padding-bottom:1px"></span>
     <button onclick="changeDate(1)">›</button>
   </div>
+  <button onclick="exportExcel()" style="background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:0 12px;height:30px;cursor:pointer;font-size:12px;margin-left:8px">🖨 프린트</button>
 </header>
 
 <!-- 캘린더 오버레이 -->
@@ -211,6 +240,7 @@ tbody td{padding:9px 10px;vertical-align:middle;}
   <div class="tab am active" onclick="switchTab('am')">🌅 오전 <span class="tab-badge" id="badge-am">0</span></div>
   <div class="tab pm" onclick="switchTab('pm')">🌇 오후 <span class="tab-badge" id="badge-pm">0</span></div>
   <div class="tab map" onclick="switchTab('map')">🗺 배치도</div>
+  <div class="tab chat" onclick="switchTab('chat')">💬 예약톡</div>
 </div>
 
 <div class="main">
@@ -234,6 +264,20 @@ tbody td{padding:9px 10px;vertical-align:middle;}
 
   <!-- 배치도 -->
   <div class="map-panel" id="map-panel"></div>
+
+  <!-- 예약톡 -->
+  <div class="chat-panel" id="chat-panel">
+    <div class="chat-sender-select">
+      <span>입력자:</span>
+      <div id="sender-btns" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+      <label class="chat-auto-toggle"><input type="checkbox" id="auto-register" checked> 자동등록</label>
+    </div>
+    <div class="chat-messages" id="chat-messages"></div>
+    <div class="chat-input-bar">
+      <textarea id="chat-input" placeholder="예약 입력 (예: 금 6시 4명 홍길동 1룸)" rows="1"></textarea>
+      <button class="chat-send-btn" onclick="sendChat()">↑</button>
+    </div>
+  </div>
 </div>
 
 <!-- 모바일 팝업 -->
@@ -345,10 +389,13 @@ function switchTab(tab){
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   document.querySelector(`.tab.${tab}`).classList.add('active');
   const isMap=(tab==='map');
-  document.getElementById('input-panel').classList.toggle('hidden',isMap);
-  document.getElementById('table-panel').style.display=isMap?'none':'';
+  const isChat=(tab==='chat');
+  document.getElementById('input-panel').classList.toggle('hidden',isMap||isChat);
+  document.getElementById('table-panel').style.display=(isMap||isChat)?'none':'';
   document.getElementById('map-panel').classList.toggle('active',isMap);
-  render();
+  document.getElementById('chat-panel').classList.toggle('active',isChat);
+  if(isChat){ renderChat(); scrollChatBottom(); }
+  else render();
 }
 
 // ── 파싱 ─────────────────────────────────────────────
@@ -396,18 +443,18 @@ function parseTimeStr(str){
   if(!am&&!pm&&h>=1&&h<=9)h+=12;
   return{h,m};
 }
-function parseInput(){
-  const raw=document.getElementById('kakao-input').value.trim();
-  const preview=document.getElementById('preview'),btn=document.getElementById('btn-add');
-  parsed=null;
-  if(!raw){preview.innerHTML='<div class="empty">입력하면 미리보기</div>';btn.disabled=true;return;}
+// 텍스트 → 예약 객체 파싱 (성공시 객체, 실패시 {error})
+function parseReservationText(raw){
+  if(!raw||!raw.trim()) return {error:'빈 입력'};
   const lines=raw.split(/\n/).map(l=>l.trim()).filter(Boolean);
+  // 한 줄 입력도 지원: 공백으로 분리
+  let workLines = lines;
+  if(lines.length===1 && lines[0].includes(' ')){
+    workLines = lines[0].split(/\s+/);
+  }
   let dateKey=currentDateKey,timeStr=null,name=null,people=null,memo=[];
-
-  // 1차: 날짜/시간/인원 먼저 확인
   const remainLines=[];
-  for(const line of lines){
-    // 오늘/내일/낼/모레
+  for(const line of workLines){
     if(/^오늘$/.test(line)){dateKey=currentDateKey;continue;}
     if(/^(내일|낼)$/.test(line)){
       const d=new Date(currentDateKey+'T00:00:00');d.setDate(d.getDate()+1);
@@ -417,7 +464,6 @@ function parseInput(){
       const d=new Date(currentDateKey+'T00:00:00');d.setDate(d.getDate()+2);
       dateKey=`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;continue;
     }
-    // 다음주/담주 + 요일
     const nextWeekMatch=line.match(/^(다음\s*주|담주)\s*([월화수목금토일])요?일?$/);
     if(nextWeekMatch){
       const dow=DAY_MAP[nextWeekMatch[2]];
@@ -426,47 +472,48 @@ function parseInput(){
       d.setDate(d.getDate()+diff);
       dateKey=`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;continue;
     }
-    // 이번주 요일
-    if(/^[월화수목금토일]요?일$/.test(line)){
+    if(/^[월화수목금토일]요?일?$/.test(line)){
       const dow=DAY_MAP[line[0]];const d=new Date(currentDateKey+'T00:00:00');
       let diff=dow-d.getDay();if(diff<0)diff+=7;
       d.setDate(d.getDate()+diff);
       dateKey=`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;continue;
     }
-    // 날짜 M/D
     const dm=line.match(/^(\d{1,2})[\/월](\d{1,2})일?$/);
     if(dm){dateKey=`${new Date().getFullYear()}-${dm[1].padStart(2,'0')}-${dm[2].padStart(2,'0')}`;continue;}
-    // 시간
     if(!timeStr&&/\d/.test(line)&&(line.includes('시')||line.includes(':')||line.includes('분뒤')||line.includes('분후')||line.includes('시간뒤')||line.includes('시간후'))){timeStr=line;continue;}
-    // 인원
     if(!people&&/^[\d.\/+]+명?$/.test(line)){people=line.replace('명','');continue;}
-    // 나머지는 이름/메모 후보
     remainLines.push(line);
   }
-
-  // 2차: 남은 줄에서 이름/메모 분리
-  // 첫 번째 줄 = 이름, 나머지 = 메모
   if(remainLines.length>=1){
     name=remainLines[0];
-    if(remainLines.length>=2){
-      memo=remainLines.slice(1);
-    }
+    if(remainLines.length>=2) memo=remainLines.slice(1);
   }
   const errors=[];
-  if(!timeStr)errors.push('시간 필요');if(!name)errors.push('예약자명 필요');
+  if(!timeStr)errors.push('시간');
+  if(!name)errors.push('예약자명');
   let timeObj=null;
-  if(timeStr){timeObj=parseTimeStr(timeStr);if(!timeObj)errors.push('시간 형식 오류');else if(timeObj.h<11||timeObj.h>=22)errors.push('범위 초과(11~21시)');}
-  if(errors.length){preview.innerHTML=`<div class="preview-error">⚠ ${errors.join(' · ')}</div>`;btn.disabled=true;return;}
+  if(timeStr){timeObj=parseTimeStr(timeStr);if(!timeObj)errors.push('시간형식');else if(timeObj.h<11||timeObj.h>=22)errors.push('시간범위(11~21시)');}
+  if(errors.length) return {error:errors.join('·')+' 필요'};
   const slot=timeObj.h<16?'am':'pm';
   const timeLabel=`${pad(timeObj.h)}:${pad(timeObj.m)}`;
-  const d=new Date(dateKey+'T00:00:00');const days=['일','월','화','수','목','금','토'];
+  return {dateKey,timeLabel,timeH:timeObj.h,name,people:people||'',memo:memo.join(' '),slot};
+}
+
+function parseInput(){
+  const raw=document.getElementById('kakao-input').value.trim();
+  const preview=document.getElementById('preview'),btn=document.getElementById('btn-add');
+  parsed=null;
+  if(!raw){preview.innerHTML='<div class="empty">입력하면 미리보기</div>';btn.disabled=true;return;}
+  const result=parseReservationText(raw);
+  if(result.error){preview.innerHTML=`<div class="preview-error">⚠ ${result.error}</div>`;btn.disabled=true;return;}
+  const d=new Date(result.dateKey+'T00:00:00');const days=['일','월','화','수','목','금','토'];
   preview.innerHTML=`
     <div class="pv-row"><span class="pv-label">날짜</span><span class="pv-val">${d.getMonth()+1}/${d.getDate()} (${days[d.getDay()]})</span></div>
-    <div class="pv-row"><span class="pv-label">시간</span><span class="pv-val pv-time-${slot}">${timeLabel} · ${slot==='am'?'오전':'오후'}</span></div>
-    <div class="pv-row"><span class="pv-label">예약자</span><span class="pv-val">${name}</span></div>
-    <div class="pv-row"><span class="pv-label">인원</span><span class="pv-val">${people||'-'}명</span></div>
-    ${memo.length?`<div class="pv-row"><span class="pv-label">메모</span><span class="pv-val">${memo.join(' ')}</span></div>`:''}`;
-  parsed={dateKey,timeLabel,timeH:timeObj.h,name,people:people||'',memo:memo.join(' '),slot};
+    <div class="pv-row"><span class="pv-label">시간</span><span class="pv-val pv-time-${result.slot}">${result.timeLabel} · ${result.slot==='am'?'오전':'오후'}</span></div>
+    <div class="pv-row"><span class="pv-label">예약자</span><span class="pv-val">${result.name}</span></div>
+    <div class="pv-row"><span class="pv-label">인원</span><span class="pv-val">${result.people||'-'}명</span></div>
+    ${result.memo?`<div class="pv-row"><span class="pv-label">메모</span><span class="pv-val">${result.memo}</span></div>`:''}`;
+  parsed=result;
   btn.disabled=false;
 }
 
@@ -735,10 +782,268 @@ function render(){
     <table><thead><tr><th>시간</th><th>예약자</th><th>인원</th><th>테이블</th><th>메모</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
+// ── 채팅 (예약톡) ─────────────────────────────────────
+let chatMessages = [];
+let senderList = loadSenderList();
+let currentSender = senderList[0] || '홀';
+let registeredMsgIds = new Set();
+
+function loadSenderList(){
+  try{const s=localStorage.getItem('sangmuok_senders');if(s)return JSON.parse(s);}catch{}
+  return ['홀','사장','주방'];
+}
+function saveSenderList(){
+  try{localStorage.setItem('sangmuok_senders',JSON.stringify(senderList));}catch{}
+}
+
+function renderSenderButtons(){
+  const wrap=document.getElementById('sender-btns');
+  if(!wrap) return;
+  wrap.innerHTML = senderList.map(s=>
+    `<button class="chat-sender-btn ${s===currentSender?'active':''}" onclick="setSender('${s.replace(/'/g,"\\'")}')" ondblclick="editSender('${s.replace(/'/g,"\\'")}')">${escapeHtml(s)}</button>`
+  ).join('') + `<button class="chat-sender-btn" style="color:#666" onclick="addSender()">+</button>`;
+}
+
+function setSender(s){
+  currentSender=s;
+  renderSenderButtons();
+}
+
+function addSender(){
+  const name=prompt('입력자 이름 추가:');
+  if(name&&name.trim()){
+    senderList.push(name.trim());
+    saveSenderList();
+    currentSender=name.trim();
+    renderSenderButtons();
+  }
+}
+
+function editSender(old){
+  const name=prompt('입력자 이름 수정 (비우면 삭제):', old);
+  if(name===null) return;
+  const idx=senderList.indexOf(old);
+  if(idx<0) return;
+  if(name.trim()===''){
+    if(senderList.length<=1){alert('최소 1명은 필요해요');return;}
+    senderList.splice(idx,1);
+    if(currentSender===old) currentSender=senderList[0];
+  }else{
+    senderList[idx]=name.trim();
+    if(currentSender===old) currentSender=name.trim();
+  }
+  saveSenderList();
+  renderSenderButtons();
+}
+
+async function loadChats(){
+  try{
+    const res=await fetch(API_URL+'?type=chats&t='+Date.now());
+    const json=await res.json();
+    chatMessages=(json.chats||[]).map(c=>({id:Number(c.id),time:String(c.time),sender:String(c.sender),text:String(c.text)}));
+  }catch(e){
+    try{const c=localStorage.getItem('sangmuok_chats');if(c)chatMessages=JSON.parse(c);}catch{}
+  }
+  renderChat();
+}
+
+async function saveChat(msg){
+  chatMessages.push(msg);
+  try{localStorage.setItem('sangmuok_chats',JSON.stringify(chatMessages));}catch{}
+  try{
+    await fetch(API_URL,{
+      method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({action:'saveChat',chat:msg})
+    });
+  }catch(e){}
+}
+
+function scrollChatBottom(){
+  const el=document.getElementById('chat-messages');
+  if(el) setTimeout(()=>{el.scrollTop=el.scrollHeight;},50);
+}
+
+async function sendChat(){
+  const input=document.getElementById('chat-input');
+  const text=input.value.trim();
+  if(!text) return;
+  const now=new Date();
+  const msg={id:Date.now(),time:now.toISOString(),sender:currentSender,text};
+  input.value='';
+  input.style.height='auto';
+
+  await saveChat(msg);
+  renderChat();
+  scrollChatBottom();
+
+  // 파싱 시도
+  const result=parseReservationText(text);
+  if(!result.error){
+    const auto=document.getElementById('auto-register').checked;
+    if(auto){
+      doRegisterFromChat(msg.id,result);
+    }
+  }
+}
+
+function doRegisterFromChat(msgId,result){
+  if(registeredMsgIds.has(msgId)) return;
+  const key=result.dateKey;
+  if(!reservations[key])reservations[key]={am:[],pm:[]};
+  reservations[key][result.slot].push({id:Date.now()+Math.random(),time:result.timeLabel,timeH:result.timeH,name:result.name,people:result.people,memo:result.memo,table:''});
+  reservations[key][result.slot].sort((a,b)=>a.time.localeCompare(b.time));
+  registeredMsgIds.add(msgId);
+  saveToSheet();
+  renderChat();
+}
+
+function renderChat(){
+  const box=document.getElementById('chat-messages');
+  if(!box) return;
+  if(!chatMessages.length){
+    box.innerHTML='<div style="text-align:center;color:#444;font-size:13px;padding:40px 0">아직 메시지가 없어요.<br>예약을 입력해보세요.</div>';
+    return;
+  }
+  const days=['일','월','화','수','목','금','토'];
+  let html='', lastDate='';
+  chatMessages.forEach(m=>{
+    const d=new Date(m.time);
+    const dateStr=`${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()} (${days[d.getDay()]})`;
+    if(dateStr!==lastDate){
+      html+=`<div class="chat-date-divider"><span>${dateStr}</span></div>`;
+      lastDate=dateStr;
+    }
+    const timeStr=`${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    const mine=(m.sender===currentSender);
+    const result=parseReservationText(m.text);
+    let parsedHtml='';
+    if(!result.error){
+      const rd=new Date(result.dateKey+'T00:00:00');
+      const registered=registeredMsgIds.has(m.id);
+      parsedHtml=`<div class="chat-msg-parsed">
+        <div class="chat-parsed-info">📋 <b>${rd.getMonth()+1}/${rd.getDate()}</b> ${result.timeLabel} · <b>${result.name}</b> ${result.people?result.people+'명':''} ${result.memo?'· '+result.memo:''}</div>
+        ${registered
+          ? `<button class="chat-register-btn done">✓ 등록됨</button>`
+          : `<button class="chat-register-btn" onclick='doRegisterFromChatById(${m.id})'>예약 등록</button>`}
+      </div>`;
+    }
+    html+=`<div class="chat-msg ${mine?'mine':''}">
+      ${!mine?`<div class="chat-msg-sender">${m.sender}</div>`:''}
+      <div class="chat-msg-text">${escapeHtml(m.text)}</div>
+      <div class="chat-msg-time">${timeStr}</div>
+      ${parsedHtml}
+    </div>`;
+  });
+  box.innerHTML=html;
+}
+
+function doRegisterFromChatById(msgId){
+  const m=chatMessages.find(x=>x.id===msgId);
+  if(!m) return;
+  const result=parseReservationText(m.text);
+  if(!result.error) doRegisterFromChat(msgId,result);
+}
+
+function escapeHtml(s){
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// 엔터로 전송 (Shift+Enter는 줄바꿈)
+document.addEventListener('DOMContentLoaded',()=>{});
+(function(){
+  const ci=document.getElementById('chat-input');
+  if(ci){
+    ci.addEventListener('keydown',e=>{
+      if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendChat();}
+    });
+    ci.addEventListener('input',()=>{
+      ci.style.height='auto';
+      ci.style.height=Math.min(ci.scrollHeight,120)+'px';
+    });
+  }
+})();
+
+// ── 프린트 (A4 예약지) ────────────────────────────────
+function exportExcel(){
+  const data=reservations[currentDateKey]||{am:[],pm:[]};
+  const d=new Date(currentDateKey+'T00:00:00');
+  const days=['일','월','화','수','목','금','토'];
+  const dateLabel=`${d.getMonth()+1}월 ${d.getDate()}일 ${days[d.getDay()]}요일`;
+
+  // 예약 행 + 빈 행(수기용) 생성
+  function buildRows(list, totalRows){
+    let html='';
+    list.forEach(r=>{
+      html+=`<tr>
+        <td>${r.table||''}</td>
+        <td>${r.time||''}</td>
+        <td>${r.name||''}</td>
+        <td style="text-align:center">${r.people||''}</td>
+        <td>${r.memo||''}</td>
+      </tr>`;
+    });
+    // 남은 빈 줄 (수기 작성용)
+    const blanks=Math.max(totalRows-list.length, 3);
+    for(let i=0;i<blanks;i++){
+      html+=`<tr><td>&nbsp;</td><td></td><td></td><td></td><td></td></tr>`;
+    }
+    return html;
+  }
+
+  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${dateLabel} 예약</title>
+  <style>
+    @page{size:A4 portrait;margin:10mm;}
+    *{box-sizing:border-box;}
+    body{font-family:'맑은 고딕','Malgun Gothic',sans-serif;margin:0;color:#000;}
+    .page{page-break-after:always;}
+    .page:last-child{page-break-after:auto;}
+    .head{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #000;padding-bottom:4px;margin-bottom:8px;}
+    .head .title{font-size:20px;font-weight:bold;}
+    .head .sub{font-size:13px;}
+    table{width:100%;border-collapse:collapse;table-layout:fixed;}
+    th,td{border:1px solid #000;padding:0;height:30px;font-size:13px;padding:2px 6px;vertical-align:middle;}
+    th{background:#e8e8e8;text-align:center;font-weight:bold;height:26px;}
+    col.c-table{width:20%;} col.c-time{width:15%;} col.c-name{width:25%;} col.c-people{width:13%;} col.c-memo{width:27%;}
+    td{overflow:hidden;white-space:nowrap;}
+    .toolbar{padding:10px;text-align:center;}
+    @media print{.toolbar{display:none;}}
+    .btn{padding:8px 24px;font-size:14px;cursor:pointer;margin:0 4px;}
+  </style></head><body>
+  <div class="toolbar">
+    <button class="btn" onclick="window.print()">🖨 프린트</button>
+    <button class="btn" onclick="window.close()">닫기</button>
+  </div>
+
+  <div class="page">
+    <div class="head"><div class="title">${dateLabel} · 오전</div><div class="sub">상무옥 예약 (11:00~15:59) · ${data.am.length}건</div></div>
+    <table>
+      <colgroup><col class="c-table"><col class="c-time"><col class="c-name"><col class="c-people"><col class="c-memo"></colgroup>
+      <thead><tr><th>테이블</th><th>시간</th><th>성함</th><th>인원수</th><th>특이사항</th></tr></thead>
+      <tbody>${buildRows(data.am, 26)}</tbody>
+    </table>
+  </div>
+
+  <div class="page">
+    <div class="head"><div class="title">${dateLabel} · 오후</div><div class="sub">상무옥 예약 (16:00~21:00) · ${data.pm.length}건</div></div>
+    <table>
+      <colgroup><col class="c-table"><col class="c-time"><col class="c-name"><col class="c-people"><col class="c-memo"></colgroup>
+      <thead><tr><th>테이블</th><th>시간</th><th>성함</th><th>인원수</th><th>특이사항</th></tr></thead>
+      <tbody>${buildRows(data.pm, 26)}</tbody>
+    </table>
+  </div>
+  </body></html>`;
+
+  const w=window.open('','_blank');
+  w.document.write(html);
+  w.document.close();
+}
+
 // ── 초기화 ────────────────────────────────────────────
 updateDateLabel();
 render(); // 먼저 화면 표시
 loadFromSheet(); // 이후 시트 동기화
+loadChats(); // 채팅 불러오기
+renderSenderButtons(); // 입력자 버튼
 
 // ── 캘린더 ────────────────────────────────────────────
 let calYear, calMonth;
