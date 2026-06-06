@@ -320,18 +320,42 @@ async function loadFromSheet(){
     const res = await fetch(API_URL + '?t=' + Date.now());
     const json = await res.json();
     reservations = {};
-    (json.data || []).forEach(row => {
-      if(!row.dateKey || !row.slot) return;
-      if(!reservations[row.dateKey]) reservations[row.dateKey] = {am:[], pm:[]};
-      reservations[row.dateKey][row.slot].push({
+    (json.data || []).forEach(raw => {
+      const row = {};
+      Object.keys(raw).forEach(k => row[k.toLowerCase()] = raw[k]);
+
+      const dateKey = String(row.datekey || '').trim();
+      const slot = String(row.slot || '').trim();
+      if(!dateKey || !slot) return;
+
+      let timeH = Number(row.timeh);
+      let timeStr = String(row.time || '');
+      let mm = 0;
+      if(/^\d{1,2}:\d{2}/.test(timeStr)){
+        const parts = timeStr.split(':');
+        timeH = Number(parts[0]);
+        mm = Number(parts[1]);
+      } else if(timeStr.includes('T')){
+        const d = new Date(timeStr);
+        if(!isNaN(d)) mm = d.getUTCMinutes();
+      }
+      if(isNaN(timeH)) timeH = 12;
+      const timeLabel = `${pad(timeH)}:${pad(mm)}`;
+
+      if(!reservations[dateKey]) reservations[dateKey] = {am:[], pm:[]};
+      reservations[dateKey][slot].push({
         id: Number(row.id),
-        time: String(row.time),
-        timeH: Number(row.timeH),
-        name: String(row.name),
-        people: String(row.people),
-        memo: String(row.memo),
-        table: String(row.table)
+        time: timeLabel,
+        timeH: timeH,
+        name: String(row.name || ''),
+        people: String(row.people || ''),
+        memo: String(row.memo || ''),
+        table: String(row.table || '')
       });
+    });
+    Object.values(reservations).forEach(s=>{
+      s.am.sort((a,b)=>a.time.localeCompare(b.time));
+      s.pm.sort((a,b)=>a.time.localeCompare(b.time));
     });
     showSyncStatus('✓ 동기화 완료', '#52c87a');
   } catch(e) {
@@ -570,25 +594,25 @@ function resolveTableLabel(val){
 }
 
 // 배치도에서 테이블 번호 매칭 (룸명 포함)
+// 배치도에서 테이블 번호 매칭 (룸명, T접미사 포함)
+function tableMatches(tableVal, tNum){
+  const t=String(tableVal).trim();
+  if(!t) return false;
+  // 룸 이름 매칭
+  for(const [room,tables] of Object.entries(ROOM_MAP)){
+    if(t===room && tables.includes(tNum)) return true;
+  }
+  // 숫자만 추출해서 비교 (41T, 41 t, T41 등 모두 41로)
+  const nums = t.match(/\d+/g);
+  if(nums && nums.map(Number).includes(tNum)) return true;
+  return false;
+}
+
 function getBookings(tNum){
   const data=reservations[currentDateKey]||{am:[],pm:[]};
   return{
-    am:data.am.filter(r=>{
-      const t=String(r.table).trim();
-      if(String(tNum)===t) return true;
-      for(const [room,tables] of Object.entries(ROOM_MAP)){
-        if(t===room && tables.includes(tNum)) return true;
-      }
-      return false;
-    }),
-    pm:data.pm.filter(r=>{
-      const t=String(r.table).trim();
-      if(String(tNum)===t) return true;
-      for(const [room,tables] of Object.entries(ROOM_MAP)){
-        if(t===room && tables.includes(tNum)) return true;
-      }
-      return false;
-    })
+    am:data.am.filter(r=>tableMatches(r.table,tNum)),
+    pm:data.pm.filter(r=>tableMatches(r.table,tNum))
   };
 }
 function cellClass(tNum){
