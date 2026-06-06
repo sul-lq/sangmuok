@@ -943,7 +943,8 @@ function renderChat(){
     let parsedHtml='';
     if(!result.error){
       const rd=new Date(result.dateKey+'T00:00:00');
-      const registered=registeredMsgIds.has(m.id);
+      // 실제 예약 데이터에 이미 있는지 대조 (로컬 플래그 + 데이터 둘 다 확인)
+      const registered = registeredMsgIds.has(m.id) || isAlreadyReserved(result);
       parsedHtml=`<div class="chat-msg-parsed">
         <div class="chat-parsed-info">📋 <b>${rd.getMonth()+1}/${rd.getDate()}</b> ${result.timeLabel} · <b>${result.name}</b> ${result.people?result.people+'명':''} ${result.memo?'· '+result.memo:''}</div>
         ${registered
@@ -965,7 +966,24 @@ function doRegisterFromChatById(msgId){
   const m=chatMessages.find(x=>x.id===msgId);
   if(!m) return;
   const result=parseReservationText(m.text);
-  if(!result.error) doRegisterFromChat(msgId,result);
+  if(result.error) return;
+  // 이미 등록된 예약이면 중복 방지
+  if(isAlreadyReserved(result)){
+    registeredMsgIds.add(msgId);
+    renderChat();
+    return;
+  }
+  doRegisterFromChat(msgId,result);
+}
+
+// 같은 예약이 이미 등록돼 있는지 확인 (날짜+시간+이름+인원 일치)
+function isAlreadyReserved(result){
+  const list=(reservations[result.dateKey]||{})[result.slot]||[];
+  return list.some(r=>
+    r.time===result.timeLabel &&
+    r.name===result.name &&
+    String(r.people)===String(result.people)
+  );
 }
 
 function escapeHtml(s){
