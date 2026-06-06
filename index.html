@@ -292,8 +292,11 @@ tbody td{padding:9px 10px;vertical-align:middle;}
   <!-- 예약톡 -->
   <div class="chat-panel" id="chat-panel">
     <div class="chat-sender-select">
-      <span>입력자:</span>
-      <div id="sender-btns" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+      <input id="chat-search" placeholder="🔍 채팅 검색" oninput="searchChat()" style="flex:1;min-width:120px;background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:6px 10px;font-size:13px;outline:none;font-family:'Noto Sans KR',sans-serif">
+      <span id="search-count" style="font-size:11px;color:var(--text-dim)"></span>
+      <span style="font-size:11px;color:var(--text-dim)">|</span>
+      <span id="my-profile" style="font-size:12px;color:var(--green);font-weight:700"></span>
+      <button onclick="logout()" style="background:none;border:none;color:var(--text-dim);font-size:11px;cursor:pointer;text-decoration:underline">로그아웃</button>
       <label class="chat-auto-toggle"><input type="checkbox" id="auto-register" checked> 자동등록</label>
     </div>
     <div class="chat-messages" id="chat-messages"></div>
@@ -303,6 +306,16 @@ tbody td{padding:9px 10px;vertical-align:middle;}
       <button class="chat-send-btn" onclick="sendChat()">↑</button>
     </div>
   </div>
+</div>
+
+<!-- 로그인 화면 -->
+<div id="login-screen" style="display:none;position:fixed;inset:0;background:var(--bg);z-index:2000;flex-direction:column;align-items:center;justify-content:center;padding:24px;">
+  <div style="font-size:24px;font-weight:700;margin-bottom:4px">상무<span style="color:var(--am)">옥</span></div>
+  <div style="font-size:13px;color:var(--text-dim);margin-bottom:28px">예약관리 로그인</div>
+  <input id="login-id" placeholder="아이디" autocomplete="username" style="width:100%;max-width:280px;background:var(--surface);border:1px solid var(--border);border-radius:10px;color:var(--text);padding:13px 14px;font-size:15px;margin-bottom:10px;outline:none">
+  <input id="login-pw" type="password" placeholder="비밀번호" autocomplete="current-password" style="width:100%;max-width:280px;background:var(--surface);border:1px solid var(--border);border-radius:10px;color:var(--text);padding:13px 14px;font-size:15px;margin-bottom:16px;outline:none">
+  <button onclick="doLogin()" style="width:100%;max-width:280px;background:var(--green);color:#000;border:none;border-radius:10px;padding:14px;font-size:15px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif">로그인</button>
+  <div id="login-error" style="color:var(--accent);font-size:13px;margin-top:12px;min-height:18px"></div>
 </div>
 
 <!-- 모바일 팝업 -->
@@ -512,11 +525,17 @@ function parseTimeStr(str){
 // 텍스트 → 예약 객체 파싱 (성공시 객체, 실패시 {error})
 function parseReservationText(raw){
   if(!raw||!raw.trim()) return {error:'빈 입력'};
-  const lines=raw.split(/\n/).map(l=>l.trim()).filter(Boolean);
-  // 한 줄 입력도 지원: 공백으로 분리
+  // 붙어있는 토큰 분리: "6시6명"→"6시 6명", "6시30분5명"→"6시30분 5명"
+  let normalized = raw
+    .replace(/(\d{1,2}\s*시\s*\d{1,2}\s*분)(\d)/g, '$1 $2')  // 6시30분5 → 6시30분 5
+    .replace(/(\d{1,2}\s*시\s*반)(\d)/g, '$1 $2')             // 6시반6 → 6시반 6
+    .replace(/(\d{1,2}\s*시)(\d{1,2}명)/g, '$1 $2')           // 6시6명 → 6시 6명
+    .replace(/(\d{1,2}:\d{2})(\d{1,2}명)/g, '$1 $2')          // 18:306명 → 18:30 6명
+    .replace(/(명)(?=\S)/g, '$1 ');                            // 6명홍길동 → 6명 홍길동
+  const lines=normalized.split(/\n/).map(l=>l.trim()).filter(Boolean);
   let workLines = lines;
   if(lines.length===1 && lines[0].includes(' ')){
-    workLines = lines[0].split(/\s+/);
+    workLines = lines[0].split(/\s+/).filter(Boolean);
   }
   let dateKey=currentDateKey,timeStr=null,name=null,people=null,memo=[];
   const remainLines=[];
@@ -653,9 +672,10 @@ function tableMatches(tableVal, tNum){
 
 function getBookings(tNum){
   const data=reservations[currentDateKey]||{am:[],pm:[]};
+  const tag=r=>Object.assign({},r,{dateKey:currentDateKey});
   return{
-    am:data.am.filter(r=>tableMatches(r.table,tNum)),
-    pm:data.pm.filter(r=>tableMatches(r.table,tNum))
+    am:data.am.filter(r=>tableMatches(r.table,tNum)).map(tag),
+    pm:data.pm.filter(r=>tableMatches(r.table,tNum)).map(tag)
   };
 }
 function cellClass(tNum){
@@ -671,8 +691,16 @@ function tblHTML(num){
   const b=getBookings(num);
   const cls=cellClass(num);
   let chips='';
-  b.am.forEach(r=>{chips+=`<div class="booking-chip chip-am">${r.time} ${r.name}</div>`;});
-  b.pm.forEach(r=>{chips+=`<div class="booking-chip chip-pm">${r.time} ${r.name}</div>`;});
+  b.am.forEach(r=>{chips+=`<div class="booking-chip chip-am">${r.time} ${escapeHtml(r.name)}</div>`;});
+  b.pm.forEach(r=>{chips+=`<div class="booking-chip chip-pm">${r.time} ${escapeHtml(r.name)}</div>`;});
+  // 이동 모드: 출발 테이블 강조, 다른 테이블은 선택 대상
+  if(moveMode){
+    const isFrom = String(moveMode.fromTable)===String(num);
+    const moveStyle = isFrom ? 'outline:2px solid var(--am);outline-offset:-2px;opacity:.6' : 'outline:2px dashed var(--green);outline-offset:-2px';
+    return`<div class="tbl-cell ${cls}" style="${moveStyle}" onclick="applyMove(${num})">
+      <div class="tbl-num">${num}</div>${chips}
+    </div>`;
+  }
   return`<div class="tbl-cell ${cls}" onclick="showTableDetail(${num})">
     <div class="tbl-num">${num}</div>${chips}
   </div>`;
@@ -684,8 +712,17 @@ function showTableDetail(tNum){
   if(!b.am.length&&!b.pm.length)return;
   document.getElementById('popup-title').textContent=`${tNum}번 테이블`;
   let html='';
-  b.am.forEach(r=>{html+=`<div class="popup-row"><span class="popup-time-am">${r.time}</span><span class="popup-name">${r.name}</span><span class="popup-people">${r.people?r.people+'명':''}</span></div>${r.memo?`<div class="popup-memo" style="padding:2px 0 6px 58px;">${r.memo}</div>`:''}`;});
-  b.pm.forEach(r=>{html+=`<div class="popup-row"><span class="popup-time-pm">${r.time}</span><span class="popup-name">${r.name}</span><span class="popup-people">${r.people?r.people+'명':''}</span></div>${r.memo?`<div class="popup-memo" style="padding:2px 0 6px 58px;">${r.memo}</div>`:''}`;});
+  function rowHtml(r,slot){
+    const cls=slot==='am'?'popup-time-am':'popup-time-pm';
+    return `<div class="popup-row">
+      <span class="${cls}">${r.time}</span>
+      <span class="popup-name">${escapeHtml(r.name)}</span>
+      <span class="popup-people">${r.people?r.people+'명':''}</span>
+      <button onclick='startMove("${r.dateKey||currentDateKey}","${slot}","${r.id}",${tNum})' style="margin-left:8px;background:var(--am);color:#000;border:none;border-radius:6px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer">이동</button>
+    </div>${r.memo?`<div class="popup-memo" style="padding:2px 0 6px 58px;">${escapeHtml(r.memo)}</div>`:''}`;
+  }
+  b.am.forEach(r=>{html+=rowHtml(r,'am');});
+  b.pm.forEach(r=>{html+=rowHtml(r,'pm');});
   if(!html)html='<div class="popup-empty">예약 없음</div>';
   document.getElementById('popup-body').innerHTML=html;
   document.getElementById('mobile-popup').classList.add('show');
@@ -694,6 +731,46 @@ function showTableDetail(tNum){
 function closePopup(){
   document.getElementById('mobile-popup').classList.remove('show');
   document.getElementById('popup-overlay').style.display='none';
+}
+
+// ── 테이블 이동 ───────────────────────────────────────
+let moveMode = null; // {dateKey, slot, id, fromTable}
+
+function startMove(dateKey, slot, id, fromTable){
+  moveMode = {dateKey, slot, id:String(id), fromTable};
+  closePopup();
+  showBanner(`이동할 테이블을 선택하세요 (${fromTable}번에서 이동)`);
+  renderMap();
+}
+
+function cancelMove(){
+  moveMode=null;
+  renderMap();
+}
+
+async function applyMove(toTable){
+  if(!moveMode) return;
+  const {dateKey, slot, id, fromTable} = moveMode;
+  const list = (reservations[dateKey]||{})[slot] || [];
+  const r = list.find(x=>String(x.id)===id);
+  if(!r){ moveMode=null; renderMap(); return; }
+  if(String(fromTable)===String(toTable)){ moveMode=null; renderMap(); return; }
+
+  r.table = String(toTable);
+  moveMode=null;
+  saveToSheet();
+  renderMap();
+
+  // 채팅방에 이동 알림 등록
+  const d=new Date(dateKey+'T00:00:00');
+  const moveMsg = {
+    id: Date.now(),
+    time: new Date().toISOString(),
+    sender: '시스템',
+    text: `📍 ${d.getMonth()+1}월 ${d.getDate()}일 · ${r.name} ${fromTable}번 → ${toTable}번 이동`
+  };
+  await saveChat(moveMsg);
+  showBanner(`${fromTable}번 → ${toTable}번 이동 완료`);
 }
 
 // ── 배치도 렌더 ──────────────────────────────────────
@@ -816,7 +893,13 @@ function renderMap(){
     </div>
   </div>`;
 
-  panel.innerHTML=legend+f1+f2;
+  const moveBar = moveMode
+    ? `<div style="background:var(--am);color:#000;padding:10px 14px;border-radius:8px;margin-bottom:12px;font-size:13px;font-weight:700;display:flex;justify-content:space-between;align-items:center">
+        <span>📍 ${moveMode.fromTable}번 → 이동할 테이블 선택</span>
+        <button onclick="cancelMove()" style="background:#000;color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer">취소</button>
+      </div>`
+    : '';
+  panel.innerHTML=moveBar+legend+f1+f2;
 }
 
 // ── 리스트 렌더 ───────────────────────────────────────
@@ -851,57 +934,70 @@ function render(){
 
 // ── 채팅 (예약톡) ─────────────────────────────────────
 let chatMessages = [];
-let senderList = loadSenderList();
-let currentSender = senderList[0] || '홀';
 let registeredMsgIds = new Set();
 let lastReadId = (()=>{try{const v=localStorage.getItem('sangmuok_lastread');return v?Number(v):null;}catch{return null;}})();
 
-function loadSenderList(){
-  try{const s=localStorage.getItem('sangmuok_senders');if(s)return JSON.parse(s);}catch{}
-  return ['홀','사장','주방'];
-}
-function saveSenderList(){
-  try{localStorage.setItem('sangmuok_senders',JSON.stringify(senderList));}catch{}
+// ── 로그인 ────────────────────────────────────────────
+let currentUser = loadUser();   // {id, name}
+let currentSender = currentUser ? currentUser.name : '';
+
+function loadUser(){
+  try{const u=localStorage.getItem('sangmuok_user');if(u)return JSON.parse(u);}catch{}
+  return null;
 }
 
-function renderSenderButtons(){
-  const wrap=document.getElementById('sender-btns');
-  if(!wrap) return;
-  wrap.innerHTML = senderList.map(s=>
-    `<button class="chat-sender-btn ${s===currentSender?'active':''}" onclick="setSender('${s.replace(/'/g,"\\'")}')" ondblclick="editSender('${s.replace(/'/g,"\\'")}')">${escapeHtml(s)}</button>`
-  ).join('') + `<button class="chat-sender-btn" style="color:#666" onclick="addSender()">+</button>`;
-}
-
-function setSender(s){
-  currentSender=s;
-  renderSenderButtons();
-}
-
-function addSender(){
-  const name=prompt('입력자 이름 추가:');
-  if(name&&name.trim()){
-    senderList.push(name.trim());
-    saveSenderList();
-    currentSender=name.trim();
-    renderSenderButtons();
+async function doLogin(){
+  const id=document.getElementById('login-id').value.trim();
+  const pw=document.getElementById('login-pw').value.trim();
+  const err=document.getElementById('login-error');
+  if(!id||!pw){err.textContent='아이디와 비밀번호를 입력하세요';return;}
+  err.textContent='확인 중...';
+  try{
+    const res=await fetch(API_URL+'?type=users&t='+Date.now());
+    const json=await res.json();
+    const user=(json.users||[]).find(u=>String(u.id)===id && String(u.pw)===pw);
+    if(!user){err.textContent='아이디 또는 비밀번호가 틀렸어요';return;}
+    currentUser={id:user.id, name:user.name};
+    currentSender=user.name;
+    try{localStorage.setItem('sangmuok_user',JSON.stringify(currentUser));}catch{}
+    document.getElementById('login-screen').style.display='none';
+    document.getElementById('my-profile').textContent=user.name;
+    renderChat();
+  }catch(e){
+    err.textContent='연결 오류. 다시 시도하세요';
   }
 }
 
-function editSender(old){
-  const name=prompt('입력자 이름 수정 (비우면 삭제):', old);
-  if(name===null) return;
-  const idx=senderList.indexOf(old);
-  if(idx<0) return;
-  if(name.trim()===''){
-    if(senderList.length<=1){alert('최소 1명은 필요해요');return;}
-    senderList.splice(idx,1);
-    if(currentSender===old) currentSender=senderList[0];
-  }else{
-    senderList[idx]=name.trim();
-    if(currentSender===old) currentSender=name.trim();
-  }
-  saveSenderList();
-  renderSenderButtons();
+function logout(){
+  if(!confirm('로그아웃 할까요?')) return;
+  currentUser=null;currentSender='';
+  try{localStorage.removeItem('sangmuok_user');}catch{}
+  showLoginScreen();
+}
+
+function showLoginScreen(){
+  const s=document.getElementById('login-screen');
+  s.style.display='flex';
+  document.getElementById('login-id').value='';
+  document.getElementById('login-pw').value='';
+  document.getElementById('login-error').textContent='';
+}
+
+// 엔터로 로그인
+document.addEventListener('DOMContentLoaded',()=>{});
+(function(){
+  const pw=document.getElementById('login-pw');
+  if(pw) pw.addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
+})();
+
+// ── 채팅 검색 ─────────────────────────────────────────
+let searchTerm='';
+function searchChat(){
+  searchTerm=document.getElementById('chat-search').value.trim().toLowerCase();
+  renderChat();
+  // 검색 결과 개수
+  const cnt=searchTerm? chatMessages.filter(m=>m.text.toLowerCase().includes(searchTerm)).length : 0;
+  document.getElementById('search-count').textContent = searchTerm? `${cnt}건` : '';
 }
 
 async function loadChats(){
@@ -1018,14 +1114,16 @@ function renderChat(){
   }
 
   chatMessages.forEach((m,idx)=>{
+    // 검색 필터: 검색어 있으면 매칭 메시지만
+    if(searchTerm && !m.text.toLowerCase().includes(searchTerm)) return;
+
     const d=new Date(m.time);
     const dateStr=`${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()} (${days[d.getDay()]})`;
     if(dateStr!==lastDate){
       html+=`<div class="chat-date-divider" data-date="${dateStr}"><span>${dateStr}</span></div>`;
       lastDate=dateStr;
     }
-    // 읽음 구분선
-    if(idx===firstUnreadIdx){
+    if(idx===firstUnreadIdx && !searchTerm){
       html+=`<div class="chat-read-divider">여기까지 읽었습니다</div>`;
     }
     const timeStr=`${pad(d.getHours())}:${pad(d.getMinutes())}`;
@@ -1042,13 +1140,22 @@ function renderChat(){
           : `<button class="chat-register-btn" onclick='doRegisterFromChatById(${m.id})'>예약 등록</button>`}
       </div>`;
     }
+    // 검색어 하이라이트
+    let textHtml=escapeHtml(m.text);
+    if(searchTerm){
+      const re=new RegExp('('+searchTerm.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','gi');
+      textHtml=textHtml.replace(re,'<mark style="background:var(--am);color:#000">$1</mark>');
+    }
     html+=`<div class="chat-msg ${mine?'mine':''}" data-date="${dateStr}">
       ${!mine?`<div class="chat-msg-sender">${escapeHtml(m.sender)}</div>`:''}
-      <div class="chat-msg-text">${escapeHtml(m.text)}</div>
+      <div class="chat-msg-text">${textHtml}</div>
       <div class="chat-msg-time">${timeStr}</div>
       ${parsedHtml}
     </div>`;
   });
+  if(searchTerm && !html){
+    html='<div style="text-align:center;color:#444;font-size:13px;padding:40px 0">검색 결과가 없어요</div>';
+  }
   box.innerHTML=html;
 }
 
@@ -1183,8 +1290,14 @@ updateDateLabel();
 render(); // 먼저 화면 표시
 loadFromSheet(); // 이후 시트 동기화
 loadChats(); // 채팅 불러오기
-renderSenderButtons(); // 입력자 버튼
 switchTab('chat'); // 앱 열면 채팅방 먼저
+
+// 로그인 체크
+if(currentUser){
+  document.getElementById('my-profile').textContent=currentUser.name;
+}else{
+  showLoginScreen();
+}
 
 // ── 캘린더 ────────────────────────────────────────────
 let calYear, calMonth;
