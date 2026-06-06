@@ -377,7 +377,7 @@ async function saveToSheet(){
     Object.entries(reservations).forEach(([dateKey,slots])=>{
       ['am','pm'].forEach(slot=>{
         (slots[slot]||[]).forEach(r=>{
-          rows.push({id:r.id,dateKey,slot,time:r.time,timeH:r.timeH,name:r.name,people:r.people,memo:r.memo,table:r.table});
+          rows.push({id:r.id, datekey:dateKey, dateKey:dateKey, slot, time:r.time, timeh:r.timeH, timeH:r.timeH, name:r.name, people:r.people, memo:r.memo, table:r.table});
         });
       });
     });
