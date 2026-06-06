@@ -598,11 +598,11 @@ function resolveTableLabel(val){
 function tableMatches(tableVal, tNum){
   const t=String(tableVal).trim();
   if(!t) return false;
-  // 룸 이름 매칭
-  for(const [room,tables] of Object.entries(ROOM_MAP)){
-    if(t===room && tables.includes(tNum)) return true;
+  // 룸 이름이면 룸 매칭만 (숫자 추출 안 함)
+  if(ROOM_MAP[t]){
+    return ROOM_MAP[t].includes(tNum);
   }
-  // 숫자만 추출해서 비교 (41T, 41 t, T41 등 모두 41로)
+  // 룸 이름이 아니면 숫자만 추출해서 비교 (41T, 41 t, 52.55T 등)
   const nums = t.match(/\d+/g);
   if(nums && nums.map(Number).includes(tNum)) return true;
   return false;
