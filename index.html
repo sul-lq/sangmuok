@@ -846,7 +846,9 @@ async function applyMove(toTable){
     sender: '시스템',
     text: `📍 ${d.getMonth()+1}월 ${d.getDate()}일 · ${r.name} ${fromTable}번 → ${toTable}번 이동`
   };
-  await saveChat(moveMsg, true);
+  chatMessages.push(moveMsg);
+  saveChat(moveMsg);
+  renderChat();
   showBanner(`${fromTable}번 → ${toTable}번 이동 완료`);
 }
 
@@ -1092,18 +1094,14 @@ async function loadChats(){
   renderChat();
 }
 
-async function saveChat(msg, addToLocal=false){
-  if(addToLocal){
-    chatMessages.push(msg);
-    try{localStorage.setItem('sangmuok_chats',JSON.stringify(chatMessages));}catch{}
-    renderChat();
-  }
-  try{
-    await fetch(API_URL,{
-      method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain'},
-      body:JSON.stringify({action:'saveChat',chat:msg})
-    });
-  }catch(e){}
+function saveChat(msg){
+  // 로컬 저장
+  try{localStorage.setItem('sangmuok_chats',JSON.stringify(chatMessages));}catch{}
+  // 시트 저장은 백그라운드 (기다리지 않음 - 화면 딜레이 없음)
+  fetch(API_URL,{
+    method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain'},
+    body:JSON.stringify({action:'saveChat',chat:msg})
+  }).catch(()=>{});
 }
 
 function scrollChatBottom(){
@@ -1212,8 +1210,10 @@ function tryModifyByReply(replyMsg, replyText){
       reservations[dateKey][slot]=reservations[dateKey][slot].filter(x=>x.id!==res.id);
       saveToSheet();
       const d=new Date(dateKey+'T00:00:00');
-      saveChat({id:Date.now(),time:new Date().toISOString(),sender:'시스템',
-        text:`❌ ${d.getMonth()+1}월 ${d.getDate()}일 · ${res.name} 예약 취소됨`},true);
+      const cancelMsg={id:Date.now(),time:new Date().toISOString(),sender:'시스템',
+        text:`❌ ${d.getMonth()+1}월 ${d.getDate()}일 · ${res.name} 예약 취소됨`};
+      chatMessages.push(cancelMsg);
+      saveChat(cancelMsg);
       render();renderChat();
       return true;
     }
@@ -1250,8 +1250,10 @@ function tryModifyByReply(replyMsg, replyText){
     if(applied.table!==undefined) res.table=applied.table;
     saveToSheet();
     const d=new Date(dateKey+'T00:00:00');
-    saveChat({id:Date.now(),time:new Date().toISOString(),sender:'시스템',
-      text:`✏️ ${d.getMonth()+1}월 ${d.getDate()}일 · ${res.name} 수정: ${summary.join(', ')}`},true);
+    const editMsg={id:Date.now(),time:new Date().toISOString(),sender:'시스템',
+      text:`✏️ ${d.getMonth()+1}월 ${d.getDate()}일 · ${res.name} 수정: ${summary.join(', ')}`};
+    chatMessages.push(editMsg);
+    saveChat(editMsg);
     render();renderChat();
   }
   return true;
@@ -1271,14 +1273,16 @@ function attachSwipeReply(){
       const dx=e.touches[0].clientX-startX;
       const dy=e.touches[0].clientY-startY;
       if(Math.abs(dy)>Math.abs(dx)){dragging=false;el.style.transform='';return;}
-      if(dx>0 && dx<80){ el.style.transform=`translateX(${dx}px)`; }
+      // 왼쪽으로 스와이프 (dx < 0)
+      if(dx<0 && dx>-80){ el.style.transform=`translateX(${dx}px)`; }
     },{passive:true});
-    el.addEventListener('touchend',e=>{
+    el.addEventListener('touchend',()=>{
       if(!dragging) return;
       dragging=false;
-      const dx=el.style.transform.match(/translateX\((\d+)/);
+      const dx=el.style.transform.match(/translateX\((-?\d+)/);
       el.style.transform='';
-      if(dx && parseInt(dx[1])>50){
+      // 왼쪽으로 50px 이상이면 답장
+      if(dx && parseInt(dx[1])<-50){
         startReply(el.getAttribute('data-id'));
       }
     });
@@ -1286,7 +1290,7 @@ function attachSwipeReply(){
     el.addEventListener('dblclick',()=>startReply(el.getAttribute('data-id')));
 
     // 본인 메시지 삭제: 길게누르기(모바일) / 우클릭(PC)
-    if(el.getAttribute('data-sender')===currentSender){
+    if(el.classList.contains('mine')){
       let pressTimer=null;
       el.addEventListener('touchstart',()=>{
         pressTimer=setTimeout(()=>askDeleteChat(el.getAttribute('data-id')),600);
@@ -1310,16 +1314,16 @@ function askDeleteChat(msgId){
   }
 }
 
-async function deleteChat(msgId){
-  chatMessages=chatMessages.filter(x=>x.id!==msgId);
+function deleteChat(msgId){
+  // 로컬에서 즉시 제거
+  chatMessages=chatMessages.filter(x=>String(x.id)!==String(msgId));
   try{localStorage.setItem('sangmuok_chats',JSON.stringify(chatMessages));}catch{}
   renderChat();
-  try{
-    await fetch(API_URL,{
-      method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain'},
-      body:JSON.stringify({action:'deleteChat',id:msgId})
-    });
-  }catch(e){}
+  // 시트에서도 삭제 (다른 사람에게도 반영 - 15초 폴링으로 동기화)
+  fetch(API_URL,{
+    method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain'},
+    body:JSON.stringify({action:'deleteChat',id:msgId})
+  }).catch(()=>{});
 }
 
 async function sendChat(){
@@ -1345,14 +1349,13 @@ async function sendChat(){
   input.style.height='auto';
   cancelReply();
 
-  // 화면 먼저 즉시 반영 (딜레이 없음)
+  // 화면 즉시 반영
   chatMessages.push(msg);
-  try{localStorage.setItem('sangmuok_chats',JSON.stringify(chatMessages));}catch{}
   renderChat();
   scrollChatBottom();
 
-  // 시트 저장은 백그라운드 (기다리지 않음)
-  saveChat(msg).catch(()=>{});
+  // 시트 저장 (백그라운드)
+  saveChat(msg);
 
   // 파싱 시도
   const result=parseReservationText(text);
@@ -1718,8 +1721,8 @@ async function autoSync(){
   }
 }
 
-// 15초마다 자동 동기화
-setInterval(autoSync, 15000);
+// 5초마다 자동 동기화
+setInterval(autoSync, 5000);
 
 // ── PWA 서비스워커 등록 ───────────────────────────────
 if('serviceWorker' in navigator){
