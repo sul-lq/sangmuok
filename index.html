@@ -77,7 +77,7 @@ header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;alig
 .chat-register-btn.done{background:var(--surface);color:var(--text-dim);cursor:default;}
 .chat-input-bar{border-top:1px solid var(--border);padding:10px 12px calc(10px + env(safe-area-inset-bottom)) 12px;display:flex;gap:10px;align-items:center;background:var(--bg);flex-shrink:0;position:relative;z-index:10;}
 .chat-input-bar textarea{flex:1;height:auto;min-height:48px;max-height:120px;font-family:'Noto Sans KR',sans-serif;font-size:15px;line-height:1.4;padding:12px 14px;}
-/* 전송 버튼: 실제 크기 116x76 (위쪽 60px 더 큼), 시각적으로 보이는 원은 56x56 */
+/* 전송 버튼: 실제 영역 96x116, 시각적 원은 입력창 옆 정중앙 */
 .chat-send-btn{
   -webkit-appearance:none;
   appearance:none;
@@ -91,15 +91,15 @@ header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;alig
   -webkit-tap-highlight-color:transparent;
   width:96px;
   height:116px;
-  margin:-30px -20px -10px -20px;
+  margin:-60px -20px 0 -20px;
   position:relative;
   font-family:inherit;
 }
-/* 보이는 원 - 버튼 안쪽 하단에 배치 */
+/* 보이는 원 - 버튼 하단 중앙 (입력창 옆 높이) */
 .chat-send-btn::after{
   content:'↑';
   position:absolute;
-  bottom:10px;
+  bottom:0;
   left:50%;
   transform:translateX(-50%);
   width:56px;
