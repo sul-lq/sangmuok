@@ -75,49 +75,62 @@ header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;alig
 .chat-parsed-info b{color:var(--text);}
 .chat-register-btn{margin-top:6px;background:var(--green);color:#000;border:none;border-radius:6px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;width:100%;font-family:'Noto Sans KR',sans-serif;}
 .chat-register-btn.done{background:var(--surface);color:var(--text-dim);cursor:default;}
-.chat-input-bar{padding:66px 80px calc(10px + env(safe-area-inset-bottom)) 12px;display:flex;gap:10px;align-items:flex-end;background:var(--bg);flex-shrink:0;position:relative;z-index:10;}
+.chat-input-bar{
+  padding:10px 84px calc(10px + env(safe-area-inset-bottom)) 12px;
+  display:flex;
+  gap:10px;
+  align-items:flex-end;
+  background:var(--bg);
+  flex-shrink:0;
+  position:relative;
+  z-index:10;
+}
 /* 라인은 입력창 영역 위에만 */
 .chat-input-bar::before{
   content:'';
   position:absolute;
-  bottom:calc(58px + env(safe-area-inset-bottom));
+  top:0;
   left:0;
-  right:80px;
+  right:0;
   height:1px;
   background:var(--border);
   pointer-events:none;
 }
-.chat-input-bar textarea{flex:1;height:auto;min-height:48px;max-height:120px;font-family:'Noto Sans KR',sans-serif;font-size:15px;line-height:1.4;padding:12px 14px;}
-/* 전송 버튼: input-bar box 안에 완전히 들어옴 */
+.chat-input-bar textarea{
+  flex:1;
+  height:auto;
+  min-height:48px;
+  max-height:120px;
+  font-family:'Noto Sans KR',sans-serif;
+  font-size:15px;
+  line-height:1.4;
+  padding:12px 14px;
+}
+/* 갤럭시/안드로이드 터치 안정화: 실제 버튼 자체가 보이는 원이 되게 함 */
 .chat-send-btn{
   -webkit-appearance:none;
   appearance:none;
-  background:transparent;
   border:none;
   outline:none;
   padding:0;
   cursor:pointer;
-  touch-action:manipulation;
+  touch-action:none;
   -webkit-tap-highlight-color:transparent;
   position:absolute;
-  right:8px;
-  bottom:calc(8px + env(safe-area-inset-bottom));
-  width:96px;
-  height:116px;
-  z-index:100;
-  font-family:inherit;
-}
-/* 보이는 원 */
-.chat-send-btn::after{
-  content:'';
-  position:absolute;
-  bottom:0;
-  left:50%;
-  transform:translateX(-50%);
+  right:12px;
+  bottom:calc(10px + env(safe-area-inset-bottom));
   width:56px;
   height:56px;
-  background:var(--green) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'><line x1='12' y1='19' x2='12' y2='5'/><polyline points='5 12 12 5 19 12'/></svg>") no-repeat center;
   border-radius:50%;
+  z-index:1000;
+  font-family:inherit;
+  background:var(--green) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'><line x1='12' y1='19' x2='12' y2='5'/><polyline points='5 12 12 5 19 12'/></svg>") no-repeat center;
+}
+.chat-send-btn:active{filter:brightness(0.9);}
+.chat-send-btn::after{content:none;}
+@media (pointer:coarse){
+  .chat-input-bar{padding-right:88px;}
+  .chat-send-btn{right:10px;width:60px;height:60px;background-size:28px 28px;}
 }
 .chat-sender-select{display:flex;gap:6px;padding:8px 12px;border-bottom:1px solid var(--border);align-items:center;flex-wrap:wrap;}
 .chat-sender-select span{font-size:11px;color:var(--text-dim);}
@@ -364,7 +377,7 @@ tbody td{padding:9px 10px;vertical-align:middle;}
     </div>
     <div class="chat-input-bar">
       <textarea id="chat-input" placeholder="예약 입력 (예: 금 6시 4명 홍길동 1룸)" rows="1"></textarea>
-      <button class="chat-send-btn" ontouchstart="event.preventDefault();" ontouchend="event.preventDefault();sendChat();" onclick="sendChat()" aria-label="전송"></button>
+      <button id="chat-send-btn" class="chat-send-btn" type="button" aria-label="전송"></button>
     </div>
   </div>
 </div>
@@ -1589,6 +1602,37 @@ const IS_MOBILE = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
       ci.style.height=Math.min(ci.scrollHeight,120)+'px';
     });
   }
+})();
+
+// 전송 버튼 터치 처리: 갤럭시에서 키보드가 먼저 내려가며 click이 씹히는 문제 방지
+(function(){
+  const btn=document.getElementById('chat-send-btn');
+  if(!btn) return;
+  let sendingLock=false;
+
+  function triggerSend(e){
+    if(e){
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    if(sendingLock) return;
+    sendingLock=true;
+    sendChat();
+    setTimeout(()=>{sendingLock=false;},250);
+  }
+
+  if(window.PointerEvent){
+    btn.addEventListener('pointerdown',e=>{
+      if(e.pointerType==='mouse' && e.button!==0) return;
+      try{btn.setPointerCapture && btn.setPointerCapture(e.pointerId);}catch(_e){}
+      triggerSend(e);
+    },{passive:false});
+  }else{
+    btn.addEventListener('touchstart',triggerSend,{passive:false});
+  }
+
+  // PC 브라우저/구형 브라우저 fallback, pointerdown 뒤 중복 전송은 lock으로 차단
+  btn.addEventListener('click',triggerSend);
 })();
 
 // ── 프린트 (A4 예약지) ────────────────────────────────
