@@ -78,8 +78,8 @@ header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;alig
 .chat-input-bar{border-top:1px solid var(--border);padding:10px 12px calc(10px + env(safe-area-inset-bottom)) 12px;display:flex;gap:10px;align-items:center;background:var(--bg);flex-shrink:0;}
 .chat-input-bar textarea{flex:1;height:auto;min-height:48px;max-height:120px;font-family:'Noto Sans KR',sans-serif;font-size:15px;line-height:1.4;padding:12px 14px;}
 .chat-send-btn{background:var(--green);color:#000;border:none;border-radius:50%;width:56px;height:56px;font-size:24px;cursor:pointer;flex-shrink:0;touch-action:manipulation;display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent;padding:0;position:relative;font-weight:700;}
-/* 터치 영역을 버튼보다 사방 20px 더 크게 */
-.chat-send-btn::before{content:'';position:absolute;inset:-20px;border-radius:50%;background:transparent;}
+/* 터치 영역: 위쪽 50px, 좌우 30px, 아래 10px - 위쪽으로 치우침 */
+.chat-send-btn::before{content:'';position:absolute;top:-50px;left:-30px;right:-30px;bottom:-10px;background:transparent;}
 .chat-sender-select{display:flex;gap:6px;padding:8px 12px;border-bottom:1px solid var(--border);align-items:center;flex-wrap:wrap;}
 .chat-sender-select span{font-size:11px;color:var(--text-dim);}
 .chat-sender-btn{background:var(--surface);border:1px solid var(--border);color:var(--text-dim);border-radius:14px;padding:4px 12px;font-size:12px;cursor:pointer;font-family:'Noto Sans KR',sans-serif;}
@@ -704,8 +704,14 @@ function addReservation(){
 }
 function deleteRow(dateKey,slot,id){
   if(!reservations[dateKey]?.[slot])return;
-  reservations[dateKey][slot]=reservations[dateKey][slot].filter(r=>r.id!==id);
-  saveToSheet();render();
+  if(!confirm('이 예약을 삭제할까요?'))return;
+  reservations[dateKey][slot]=reservations[dateKey][slot].filter(r=>String(r.id)!==String(id));
+  try{localStorage.setItem('sangmuok_v2',JSON.stringify(reservations));}catch{}
+  render();
+  // 삭제 동안 autoSync 차단 (시트 동기화 완료 대기)
+  autoSyncPaused=true;
+  saveToSheet();
+  setTimeout(()=>{autoSyncPaused=false;},10000);
 }
 function updateTable(dateKey,slot,id,val){
   const r=reservations[dateKey]?.[slot]?.find(r=>r.id===id);
@@ -1229,8 +1235,11 @@ function tryModifyByReply(replyMsg, replyText){
   // 취소
   if(changes.cancel){
     if(confirm(`예약을 취소할까요?\n\n${res.name} ${res.time} ${res.people}명`)){
-      reservations[dateKey][slot]=reservations[dateKey][slot].filter(x=>x.id!==res.id);
+      reservations[dateKey][slot]=reservations[dateKey][slot].filter(x=>String(x.id)!==String(res.id));
+      try{localStorage.setItem('sangmuok_v2',JSON.stringify(reservations));}catch{}
+      autoSyncPaused=true;
       saveToSheet();
+      setTimeout(()=>{autoSyncPaused=false;},10000);
       const d=new Date(dateKey+'T00:00:00');
       const cancelMsg={id:Date.now(),time:new Date().toISOString(),sender:'시스템',
         text:`❌ ${d.getMonth()+1}월 ${d.getDate()}일 · ${res.name} 예약 취소됨`};
@@ -1263,14 +1272,17 @@ function tryModifyByReply(replyMsg, replyText){
     if(applied.time){ res.time=applied.time; res.timeH=applied.timeH;
       // 시간대(오전/오후) 바뀌면 이동
       if(applied.newSlot!==slot){
-        reservations[dateKey][slot]=reservations[dateKey][slot].filter(x=>x.id!==res.id);
+        reservations[dateKey][slot]=reservations[dateKey][slot].filter(x=>String(x.id)!==String(res.id));
         if(!reservations[dateKey][applied.newSlot])reservations[dateKey][applied.newSlot]=[];
         reservations[dateKey][applied.newSlot].push(res);
       }
     }
     if(applied.people!==undefined) res.people=applied.people;
     if(applied.table!==undefined) res.table=applied.table;
+    try{localStorage.setItem('sangmuok_v2',JSON.stringify(reservations));}catch{}
+    autoSyncPaused=true;
     saveToSheet();
+    setTimeout(()=>{autoSyncPaused=false;},10000);
     const d=new Date(dateKey+'T00:00:00');
     const editMsg={id:Date.now(),time:new Date().toISOString(),sender:'시스템',
       text:`✏️ ${d.getMonth()+1}월 ${d.getDate()}일 · ${res.name} 수정: ${summary.join(', ')}`};
