@@ -323,7 +323,7 @@ tbody td{padding:9px 10px;vertical-align:middle;}
     </div>
     <div class="chat-input-bar">
       <textarea id="chat-input" placeholder="예약 입력 (예: 금 6시 4명 홍길동 1룸)" rows="1"></textarea>
-      <button class="chat-send-btn" onmousedown="event.preventDefault()" onclick="sendChat()">↑</button>
+      <button class="chat-send-btn" ontouchstart="event.preventDefault();sendChat();" onclick="sendChat()">↑</button>
     </div>
   </div>
 </div>
@@ -1346,9 +1346,9 @@ async function sendChat(){
   const msg={id:Date.now(),time:now.toISOString(),sender:currentSender,text};
   if(replyTarget) msg.replyTo=replyTarget.id;
   input.value='';
-  input.style.height='auto';
-  // 모바일 키보드 유지 (포커스 재설정)
-  if(IS_MOBILE) input.focus();
+  input.style.height='42px';
+  // 모바일 키보드 유지
+  if(IS_MOBILE) setTimeout(()=>input.focus(),10);
   cancelReply();
 
   // 화면 즉시 반영
