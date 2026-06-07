@@ -75,7 +75,18 @@ header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;alig
 .chat-parsed-info b{color:var(--text);}
 .chat-register-btn{margin-top:6px;background:var(--green);color:#000;border:none;border-radius:6px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;width:100%;font-family:'Noto Sans KR',sans-serif;}
 .chat-register-btn.done{background:var(--surface);color:var(--text-dim);cursor:default;}
-.chat-input-bar{border-top:1px solid var(--border);padding:10px 12px calc(10px + env(safe-area-inset-bottom)) 12px;display:flex;gap:10px;align-items:center;background:var(--bg);flex-shrink:0;position:relative;z-index:10;}
+.chat-input-bar{padding:10px 12px calc(10px + env(safe-area-inset-bottom)) 12px;display:flex;gap:10px;align-items:center;background:var(--bg);flex-shrink:0;position:relative;z-index:10;}
+/* 라인은 입력창 영역 위에만 - 버튼 터치 영역 방해 안 함 */
+.chat-input-bar::before{
+  content:'';
+  position:absolute;
+  top:0;
+  left:0;
+  right:96px;
+  height:1px;
+  background:var(--border);
+  pointer-events:none;
+}
 .chat-input-bar textarea{flex:1;height:auto;min-height:48px;max-height:120px;font-family:'Noto Sans KR',sans-serif;font-size:15px;line-height:1.4;padding:12px 14px;}
 /* 전송 버튼: 실제 영역 96x116, 시각적 원은 입력창 옆 정중앙 */
 .chat-send-btn{
