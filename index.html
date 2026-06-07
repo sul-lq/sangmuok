@@ -846,7 +846,7 @@ async function applyMove(toTable){
     sender: '시스템',
     text: `📍 ${d.getMonth()+1}월 ${d.getDate()}일 · ${r.name} ${fromTable}번 → ${toTable}번 이동`
   };
-  await saveChat(moveMsg);
+  await saveChat(moveMsg, true);
   showBanner(`${fromTable}번 → ${toTable}번 이동 완료`);
 }
 
@@ -1092,9 +1092,12 @@ async function loadChats(){
   renderChat();
 }
 
-async function saveChat(msg){
-  chatMessages.push(msg);
-  try{localStorage.setItem('sangmuok_chats',JSON.stringify(chatMessages));}catch{}
+async function saveChat(msg, addToLocal=false){
+  if(addToLocal){
+    chatMessages.push(msg);
+    try{localStorage.setItem('sangmuok_chats',JSON.stringify(chatMessages));}catch{}
+    renderChat();
+  }
   try{
     await fetch(API_URL,{
       method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain'},
@@ -1210,7 +1213,7 @@ function tryModifyByReply(replyMsg, replyText){
       saveToSheet();
       const d=new Date(dateKey+'T00:00:00');
       saveChat({id:Date.now(),time:new Date().toISOString(),sender:'시스템',
-        text:`❌ ${d.getMonth()+1}월 ${d.getDate()}일 · ${res.name} 예약 취소됨`});
+        text:`❌ ${d.getMonth()+1}월 ${d.getDate()}일 · ${res.name} 예약 취소됨`},true);
       render();renderChat();
       return true;
     }
@@ -1248,7 +1251,7 @@ function tryModifyByReply(replyMsg, replyText){
     saveToSheet();
     const d=new Date(dateKey+'T00:00:00');
     saveChat({id:Date.now(),time:new Date().toISOString(),sender:'시스템',
-      text:`✏️ ${d.getMonth()+1}월 ${d.getDate()}일 · ${res.name} 수정: ${summary.join(', ')}`});
+      text:`✏️ ${d.getMonth()+1}월 ${d.getDate()}일 · ${res.name} 수정: ${summary.join(', ')}`},true);
     render();renderChat();
   }
   return true;
@@ -1283,7 +1286,7 @@ function attachSwipeReply(){
     el.addEventListener('dblclick',()=>startReply(el.getAttribute('data-id')));
 
     // 본인 메시지 삭제: 길게누르기(모바일) / 우클릭(PC)
-    if(el.classList.contains('mine')){
+    if(el.getAttribute('data-sender')===currentSender){
       let pressTimer=null;
       el.addEventListener('touchstart',()=>{
         pressTimer=setTimeout(()=>askDeleteChat(el.getAttribute('data-id')),600);
@@ -1342,17 +1345,20 @@ async function sendChat(){
   input.style.height='auto';
   cancelReply();
 
-  await saveChat(msg);
+  // 화면 먼저 즉시 반영 (딜레이 없음)
+  chatMessages.push(msg);
+  try{localStorage.setItem('sangmuok_chats',JSON.stringify(chatMessages));}catch{}
   renderChat();
   scrollChatBottom();
+
+  // 시트 저장은 백그라운드 (기다리지 않음)
+  saveChat(msg).catch(()=>{});
 
   // 파싱 시도
   const result=parseReservationText(text);
   if(!result.error){
     const auto=document.getElementById('auto-register').checked;
-    if(auto){
-      doRegisterFromChat(msg.id,result);
-    }
+    if(auto){ doRegisterFromChat(msg.id,result); }
   }
 }
 
@@ -1431,7 +1437,7 @@ function renderChat(){
         quoteHtml=`<div class="chat-quote"><div class="chat-quote-sender">${escapeHtml(orig.sender)}</div><div class="chat-quote-text">${escapeHtml(orig.text.slice(0,40))}</div></div>`;
       }
     }
-    html+=`<div class="chat-msg ${mine?'mine':''}" data-date="${dateStr}" data-id="${m.id}">
+    html+=`<div class="chat-msg ${mine?'mine':''}" data-date="${dateStr}" data-id="${m.id}" data-sender="${escapeHtml(m.sender)}">
       ${!mine?`<div class="chat-msg-sender">${escapeHtml(m.sender)}</div>`:''}
       ${quoteHtml}
       <div class="chat-msg-text">${textHtml}</div>
