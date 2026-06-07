@@ -77,7 +77,9 @@ header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;alig
 .chat-register-btn.done{background:var(--surface);color:var(--text-dim);cursor:default;}
 .chat-input-bar{border-top:1px solid var(--border);padding:8px 12px;display:flex;gap:8px;align-items:center;background:var(--bg);}
 .chat-input-bar textarea{flex:1;height:auto;min-height:44px;max-height:120px;font-family:'Noto Sans KR',sans-serif;font-size:14px;line-height:1.4;padding:10px 12px;}
-.chat-send-btn{background:var(--green);color:#000;border:none;border-radius:12px;width:52px;height:52px;font-size:22px;cursor:pointer;flex-shrink:0;touch-action:manipulation;display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent;padding:0;}
+.chat-send-btn{background:var(--green);color:#000;border:none;border-radius:50%;width:52px;height:52px;font-size:22px;cursor:pointer;flex-shrink:0;touch-action:manipulation;display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent;padding:0;position:relative;}
+/* 터치 영역을 버튼보다 20px 더 크게 */
+.chat-send-btn::before{content:'';position:absolute;inset:-14px;border-radius:50%;}
 .chat-sender-select{display:flex;gap:6px;padding:8px 12px;border-bottom:1px solid var(--border);align-items:center;flex-wrap:wrap;}
 .chat-sender-select span{font-size:11px;color:var(--text-dim);}
 .chat-sender-btn{background:var(--surface);border:1px solid var(--border);color:var(--text-dim);border-radius:14px;padding:4px 12px;font-size:12px;cursor:pointer;font-family:'Noto Sans KR',sans-serif;}
@@ -1014,7 +1016,21 @@ function render(){
 // ── 채팅 (예약톡) ─────────────────────────────────────
 let chatMessages = [];
 let registeredMsgIds = new Set();
-let deletedChatIds = new Set(); // 삭제한 메시지 ID 추적
+// 삭제한 메시지 ID - localStorage에 영구 저장 (폴링으로 복원 방지)
+let deletedChatIds = new Set(
+  (()=>{
+    try{
+      const v=localStorage.getItem('sangmuok_deleted');
+      if(!v) return [];
+      const ids=JSON.parse(v);
+      const cutoff=Date.now()-(30*24*60*60*1000); // 30일
+      return ids.filter(id=>Number(id)>cutoff);
+    }catch{return [];}
+  })()
+);
+function saveDeletedIds(){
+  try{localStorage.setItem('sangmuok_deleted',JSON.stringify([...deletedChatIds]));}catch{}
+}
 let lastReadId = (()=>{try{const v=localStorage.getItem('sangmuok_lastread');return v?Number(v):null;}catch{return null;}})();
 
 // ── 로그인 ────────────────────────────────────────────
@@ -1084,13 +1100,18 @@ async function loadChats(){
   try{
     const res=await fetch(API_URL+'?type=chats&t='+Date.now());
     const json=await res.json();
-    chatMessages=(json.chats||[]).map(c=>{
-      const msg={id:Number(c.id),time:String(c.time),sender:String(c.sender),text:String(c.text)};
-      if(c.replyTo && String(c.replyTo).trim()) msg.replyTo=Number(c.replyTo);
-      return msg;
-    });
+    chatMessages=(json.chats||[])
+      .filter(c=>!deletedChatIds.has(String(c.id)))
+      .map(c=>{
+        const msg={id:Number(c.id),time:String(c.time),sender:String(c.sender),text:String(c.text)};
+        if(c.replyTo && String(c.replyTo).trim()) msg.replyTo=Number(c.replyTo);
+        return msg;
+      });
   }catch(e){
-    try{const c=localStorage.getItem('sangmuok_chats');if(c)chatMessages=JSON.parse(c);}catch{}
+    try{const c=localStorage.getItem('sangmuok_chats');if(c){
+      const all=JSON.parse(c);
+      chatMessages=all.filter(x=>!deletedChatIds.has(String(x.id)));
+    }}catch{}
   }
   renderChat();
 }
@@ -1316,17 +1337,19 @@ function askDeleteChat(msgId){
 }
 
 function deleteChat(msgId){
-  deletedChatIds.add(String(msgId));
-  chatMessages=chatMessages.filter(x=>String(x.id)!==String(msgId));
+  const id=String(msgId);
+  deletedChatIds.add(id);
+  saveDeletedIds();
+  chatMessages=chatMessages.filter(x=>String(x.id)!==id);
   try{localStorage.setItem('sangmuok_chats',JSON.stringify(chatMessages));}catch{}
   renderChat();
+  // 시트 삭제 요청 (no-cors라 응답 확인 불가 - 넉넉히 10초 sync 차단)
   autoSyncPaused=true;
   fetch(API_URL,{
     method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain'},
     body:JSON.stringify({action:'deleteChat',id:msgId})
-  }).catch(()=>{}).finally(()=>{
-    setTimeout(()=>{autoSyncPaused=false;},3000);
-  });
+  }).catch(()=>{});
+  setTimeout(()=>{autoSyncPaused=false;},10000);
 }
 
 async function sendChat(){
@@ -1349,9 +1372,11 @@ async function sendChat(){
   const msg={id:Date.now(),time:now.toISOString(),sender:currentSender,text};
   if(replyTarget) msg.replyTo=replyTarget.id;
   input.value='';
-  input.style.height='42px';
+  input.style.height='44px';
   cancelReply();
-  // 키보드 유지 (항상 포커스)
+  // 키보드 유지 (iOS Safari 대응 - readOnly 토글)
+  input.readOnly=true;
+  input.readOnly=false;
   input.focus();
 
   // 화면 즉시 반영
