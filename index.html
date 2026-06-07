@@ -75,11 +75,11 @@ header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;alig
 .chat-parsed-info b{color:var(--text);}
 .chat-register-btn{margin-top:6px;background:var(--green);color:#000;border:none;border-radius:6px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;width:100%;font-family:'Noto Sans KR',sans-serif;}
 .chat-register-btn.done{background:var(--surface);color:var(--text-dim);cursor:default;}
-.chat-input-bar{border-top:1px solid var(--border);padding:10px 12px calc(10px + env(safe-area-inset-bottom)) 12px;display:flex;gap:10px;align-items:center;background:var(--bg);flex-shrink:0;}
+.chat-input-bar{border-top:1px solid var(--border);padding:10px 12px calc(10px + env(safe-area-inset-bottom)) 12px;display:flex;gap:10px;align-items:center;background:var(--bg);flex-shrink:0;position:relative;z-index:10;}
 .chat-input-bar textarea{flex:1;height:auto;min-height:48px;max-height:120px;font-family:'Noto Sans KR',sans-serif;font-size:15px;line-height:1.4;padding:12px 14px;}
-.chat-send-btn{background:var(--green);color:#000;border:none;border-radius:50%;width:56px;height:56px;font-size:24px;cursor:pointer;flex-shrink:0;touch-action:manipulation;display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent;padding:0;position:relative;font-weight:700;}
-/* 터치 영역: 위쪽 50px, 좌우 30px, 아래 10px - 위쪽으로 치우침 */
-.chat-send-btn::before{content:'';position:absolute;top:-50px;left:-30px;right:-30px;bottom:-10px;background:transparent;}
+.chat-send-btn{background:var(--green);color:#000;border:none;border-radius:50%;width:56px;height:56px;font-size:24px;cursor:pointer;flex-shrink:0;touch-action:manipulation;display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent;padding:0;position:relative;font-weight:700;z-index:11;}
+/* 터치 영역: 위쪽 60px, 좌우 30px, 아래 15px - 위쪽으로 크게 확장 */
+.chat-send-btn::before{content:'';position:absolute;top:-60px;left:-30px;right:-30px;bottom:-15px;background:transparent;z-index:12;}
 .chat-sender-select{display:flex;gap:6px;padding:8px 12px;border-bottom:1px solid var(--border);align-items:center;flex-wrap:wrap;}
 .chat-sender-select span{font-size:11px;color:var(--text-dim);}
 .chat-sender-btn{background:var(--surface);border:1px solid var(--border);color:var(--text-dim);border-radius:14px;padding:4px 12px;font-size:12px;cursor:pointer;font-family:'Noto Sans KR',sans-serif;}
