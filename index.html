@@ -1281,7 +1281,42 @@ function attachSwipeReply(){
     });
     // PC: 더블클릭으로 답장
     el.addEventListener('dblclick',()=>startReply(el.getAttribute('data-id')));
+
+    // 본인 메시지 삭제: 길게누르기(모바일) / 우클릭(PC)
+    if(el.classList.contains('mine')){
+      let pressTimer=null;
+      el.addEventListener('touchstart',()=>{
+        pressTimer=setTimeout(()=>askDeleteChat(el.getAttribute('data-id')),600);
+      },{passive:true});
+      el.addEventListener('touchend',()=>clearTimeout(pressTimer));
+      el.addEventListener('touchmove',()=>clearTimeout(pressTimer));
+      el.addEventListener('contextmenu',e=>{
+        e.preventDefault();
+        askDeleteChat(el.getAttribute('data-id'));
+      });
+    }
   });
+}
+
+function askDeleteChat(msgId){
+  const m=chatMessages.find(x=>String(x.id)===String(msgId));
+  if(!m) return;
+  if(m.sender!==currentSender){ showBanner('본인 메시지만 삭제할 수 있어요'); return; }
+  if(confirm(`이 메시지를 삭제할까요?\n\n"${m.text.slice(0,40)}"`)){
+    deleteChat(m.id);
+  }
+}
+
+async function deleteChat(msgId){
+  chatMessages=chatMessages.filter(x=>x.id!==msgId);
+  try{localStorage.setItem('sangmuok_chats',JSON.stringify(chatMessages));}catch{}
+  renderChat();
+  try{
+    await fetch(API_URL,{
+      method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({action:'deleteChat',id:msgId})
+    });
+  }catch(e){}
 }
 
 async function sendChat(){
