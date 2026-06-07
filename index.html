@@ -75,20 +75,20 @@ header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;alig
 .chat-parsed-info b{color:var(--text);}
 .chat-register-btn{margin-top:6px;background:var(--green);color:#000;border:none;border-radius:6px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;width:100%;font-family:'Noto Sans KR',sans-serif;}
 .chat-register-btn.done{background:var(--surface);color:var(--text-dim);cursor:default;}
-.chat-input-bar{padding:10px 12px calc(10px + env(safe-area-inset-bottom)) 12px;display:flex;gap:10px;align-items:center;background:var(--bg);flex-shrink:0;position:relative;z-index:10;}
-/* 라인은 입력창 영역 위에만 - 버튼 터치 영역 방해 안 함 */
+.chat-input-bar{padding:10px 80px calc(10px + env(safe-area-inset-bottom)) 12px;display:flex;gap:10px;align-items:center;background:var(--bg);flex-shrink:0;position:relative;z-index:10;}
+/* 라인은 입력창 영역 위에만 */
 .chat-input-bar::before{
   content:'';
   position:absolute;
   top:0;
   left:0;
-  right:96px;
+  right:80px;
   height:1px;
   background:var(--border);
   pointer-events:none;
 }
 .chat-input-bar textarea{flex:1;height:auto;min-height:48px;max-height:120px;font-family:'Noto Sans KR',sans-serif;font-size:15px;line-height:1.4;padding:12px 14px;}
-/* 전송 버튼: 실제 영역 96x116, 시각적 원은 입력창 옆 정중앙 */
+/* 전송 버튼: absolute로 띄움 - 부모 overflow 영향 X */
 .chat-send-btn{
   -webkit-appearance:none;
   appearance:none;
@@ -97,32 +97,27 @@ header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;alig
   outline:none;
   padding:0;
   cursor:pointer;
-  flex-shrink:0;
   touch-action:manipulation;
   -webkit-tap-highlight-color:transparent;
+  position:absolute;
+  right:8px;
+  bottom:calc(8px + env(safe-area-inset-bottom));
   width:96px;
   height:116px;
-  margin:-60px -20px 0 -20px;
-  position:relative;
+  z-index:100;
   font-family:inherit;
 }
-/* 보이는 원 - 버튼 하단 중앙 (입력창 옆 높이) */
+/* 보이는 원 - 버튼 하단 중앙 */
 .chat-send-btn::after{
-  content:'↑';
+  content:'';
   position:absolute;
   bottom:0;
   left:50%;
   transform:translateX(-50%);
   width:56px;
   height:56px;
-  background:var(--green);
-  color:#000;
+  background:var(--green) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'><line x1='12' y1='19' x2='12' y2='5'/><polyline points='5 12 12 5 19 12'/></svg>") no-repeat center;
   border-radius:50%;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  font-size:24px;
-  font-weight:700;
 }
 .chat-sender-select{display:flex;gap:6px;padding:8px 12px;border-bottom:1px solid var(--border);align-items:center;flex-wrap:wrap;}
 .chat-sender-select span{font-size:11px;color:var(--text-dim);}
