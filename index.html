@@ -51,8 +51,21 @@ header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;alig
 /* 읽음 구분선 */
 .chat-read-divider{display:flex;align-items:center;gap:8px;margin:6px 0;color:#e85d4a;font-size:11px;}
 .chat-read-divider::before,.chat-read-divider::after{content:'';flex:1;height:1px;background:rgba(232,93,74,.4);}
-.chat-msg{max-width:75%;align-self:flex-start;background:var(--surface2);border-radius:4px 14px 14px 14px;padding:10px 13px;position:relative;}
+.chat-msg{max-width:75%;align-self:flex-start;background:var(--surface2);border-radius:4px 14px 14px 14px;padding:10px 13px;position:relative;transition:transform .15s;touch-action:pan-y;}
 .chat-msg.mine{align-self:flex-end;background:#2a3f2f;border-radius:14px 4px 14px 14px;}
+/* 답장 인용 (메시지 안) */
+.chat-quote{border-left:3px solid var(--am);padding:4px 8px;margin-bottom:6px;background:rgba(255,255,255,.05);border-radius:4px;font-size:12px;}
+.chat-quote-sender{color:var(--am);font-weight:700;font-size:10px;}
+.chat-quote-text{color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+/* 답장 화살표 (스와이프 시 나타남) */
+.chat-reply-hint{position:absolute;left:-30px;top:50%;transform:translateY(-50%);color:var(--am);font-size:18px;opacity:0;transition:opacity .15s;}
+/* 입력창 위 답장 미리보기 바 */
+.reply-bar{display:none;align-items:center;gap:10px;padding:8px 12px;background:var(--surface2);border-top:1px solid var(--border);font-size:12px;}
+.reply-bar.show{display:flex;}
+.reply-bar-info{flex:1;min-width:0;}
+.reply-bar-sender{color:var(--am);font-weight:700;font-size:11px;}
+.reply-bar-text{color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.reply-bar-close{background:none;border:none;color:var(--text-dim);font-size:18px;cursor:pointer;padding:0 4px;}
 .chat-msg-sender{font-size:11px;color:var(--am);font-weight:700;margin-bottom:3px;}
 .chat-msg.mine .chat-msg-sender{color:var(--green);}
 .chat-msg-text{font-size:14px;line-height:1.5;white-space:pre-wrap;word-break:break-word;}
@@ -301,6 +314,13 @@ tbody td{padding:9px 10px;vertical-align:middle;}
     </div>
     <div class="chat-messages" id="chat-messages"></div>
     <div class="chat-floating-date" id="chat-floating-date"></div>
+    <div class="reply-bar" id="reply-bar">
+      <div class="reply-bar-info">
+        <div class="reply-bar-sender" id="reply-bar-sender"></div>
+        <div class="reply-bar-text" id="reply-bar-text"></div>
+      </div>
+      <button class="reply-bar-close" onclick="cancelReply()">✕</button>
+    </div>
     <div class="chat-input-bar">
       <textarea id="chat-input" placeholder="예약 입력 (예: 금 6시 4명 홍길동 1룸)" rows="1"></textarea>
       <button class="chat-send-btn" onclick="sendChat()">↑</button>
@@ -483,6 +503,8 @@ function parseTimeStr(str){
   let pm=false,am=false;
   if(str.includes('오후')){pm=true;str=str.replace('오후','').trim();}
   if(str.includes('오전')){am=true;str=str.replace('오전','').trim();}
+  // 조사 제거: "6시로", "6시에", "6시까지"
+  str=str.replace(/시(로|에|까지|쯤|경)$/,'시').trim();
 
   // N분뒤/후
   const minLater=str.match(/^(\d+)\s*분\s*(뒤|후)$/);
@@ -504,7 +526,10 @@ function parseTimeStr(str){
 
   // 6시30분, 6시 30분
   const hm2=str.match(/^(\d{1,2})\s*시\s*(\d{1,2})\s*분$/);
+  // 12시30 (분 글자 없이 숫자만) - 카톡에서 가장 흔한 형태
+  const hm3=str.match(/^(\d{1,2})\s*시\s*(\d{1,2})$/);
   if(hm2){h=parseInt(hm2[1]);m=parseInt(hm2[2]);}
+  else if(hm3){h=parseInt(hm3[1]);m=parseInt(hm3[2]);}
   // 6시반
   else if(/^(\d{1,2})\s*시\s*반$/.test(str)){h=parseInt(str.match(/^(\d{1,2})/)[1]);m=30;}
   // 6시
@@ -525,18 +550,20 @@ function parseTimeStr(str){
 // 텍스트 → 예약 객체 파싱 (성공시 객체, 실패시 {error})
 function parseReservationText(raw){
   if(!raw||!raw.trim()) return {error:'빈 입력'};
-  // 붙어있는 토큰 분리: "6시6명"→"6시 6명", "6시30분5명"→"6시30분 5명"
+  // 붙어있는 토큰 분리
   let normalized = raw
-    .replace(/(\d{1,2}\s*시\s*\d{1,2}\s*분)(\d)/g, '$1 $2')  // 6시30분5 → 6시30분 5
-    .replace(/(\d{1,2}\s*시\s*반)(\d)/g, '$1 $2')             // 6시반6 → 6시반 6
-    .replace(/(\d{1,2}\s*시)(\d{1,2}명)/g, '$1 $2')           // 6시6명 → 6시 6명
-    .replace(/(\d{1,2}:\d{2})(\d{1,2}명)/g, '$1 $2')          // 18:306명 → 18:30 6명
-    .replace(/(명)(?=\S)/g, '$1 ');                            // 6명홍길동 → 6명 홍길동
+    .replace(/(\d{1,2}\s*시\s*\d{1,2}\s*분)(\d{1,2}\/?\d*명)/g, '$1 $2')  // 6시30분5명 → 6시30분 5명
+    .replace(/(\d{1,2}\s*시\s*반)(\d{1,2}\/?\d*명)/g, '$1 $2')             // 6시반6명 → 6시반 6명
+    .replace(/(\d{1,2}\s*시\s*\d{1,2})(명)/g, '$1$2')                       // 보호: 12시30명 방지 안함(드묾)
+    .replace(/(\d{1,2}\s*시)(\d{1,2}\/?\d*명)/g, '$1 $2')                  // 6시6명 → 6시 6명
+    .replace(/(\d{1,2}:\d{2})(\d{1,2}\/?\d*명)/g, '$1 $2')                 // 18:306명 → 18:30 6명
+    .replace(/(명)(?=\S)/g, '$1 ');                                         // 6명홍길동 → 6명 홍길동
   const lines=normalized.split(/\n/).map(l=>l.trim()).filter(Boolean);
-  let workLines = lines;
-  if(lines.length===1 && lines[0].includes(' ')){
-    workLines = lines[0].split(/\s+/).filter(Boolean);
-  }
+  // 모든 줄을 공백 기준으로 토큰화 (한 줄에 여러 정보 있어도 분리)
+  let workLines = [];
+  lines.forEach(l=>{
+    l.split(/\s+/).filter(Boolean).forEach(tok=>workLines.push(tok));
+  });
   let dateKey=currentDateKey,timeStr=null,name=null,people=null,memo=[];
   const remainLines=[];
   const TODAY = todayKey(); // 실제 오늘 (보고 있는 날짜 아님)
@@ -567,22 +594,44 @@ function parseReservationText(raw){
     }
     const dm=line.match(/^(\d{1,2})[\/월](\d{1,2})일?$/);
     if(dm){dateKey=`${new Date().getFullYear()}-${dm[1].padStart(2,'0')}-${dm[2].padStart(2,'0')}`;continue;}
-    // 시간 토큰
-    if(!timeStr&&/\d/.test(line)&&(line.includes('시')||line.includes(':')||line.includes('분뒤')||line.includes('분후')||line.includes('시간뒤')||line.includes('시간후'))){
+    // N일 단독 (예: "12일") - 이번 달 또는 다음 달 해당 일자
+    const dayOnly=line.match(/^(\d{1,2})일$/);
+    if(dayOnly){
+      const day=parseInt(dayOnly[1]);
+      const t=new Date(TODAY+'T00:00:00');
+      let y=t.getFullYear(), mo=t.getMonth();
+      // 오늘보다 이전 일자면 다음 달로
+      if(day<t.getDate()) mo++;
+      if(mo>11){mo=0;y++;}
+      dateKey=`${y}-${pad(mo+1)}-${pad(day)}`;continue;
+    }
+    // 시간 토큰 (12시, 12시30, 12시30분, 12:30, 6시반)
+    if(!timeStr && /^\d{1,2}\s*(시|:)/.test(line) || (!timeStr && /\d/.test(line) && (line.includes('분뒤')||line.includes('분후')||line.includes('시간뒤')||line.includes('시간후')))){
       timeStr=line;
-      // 다음 토큰이 "30분"처럼 분 단독이면 시간에 흡수 (11시 30분)
-      if(li+1<workLines.length && /^\d{1,2}분$/.test(workLines[li+1]) && line.includes('시') && !line.includes('분')){
-        timeStr=line+workLines[li+1];
-        li++; // 분 토큰 소비
+      // 다음 토큰이 "30분" 또는 "30"(분단독)이면 시간에 흡수 (11시 30분 / 11시 30)
+      if(li+1<workLines.length && /^\d{1,2}분?$/.test(workLines[li+1]) && line.includes('시') && !/\d시\d/.test(line) && !line.includes('분')){
+        timeStr=line.replace(/분?$/,'')+workLines[li+1];
+        li++;
       }
       continue;
     }
-    if(!people&&/^[\d.\/+]+명?$/.test(line)){people=line.replace('명','');continue;}
+    // 인원 토큰: 5명, 5/1명, 5.1명, 5+1명 (점/슬래시/플러스 = 어른/유아 구분)
+    if(!people && /^\d+[.\/+]?\d*\s*명$/.test(line)){
+      people=line.replace('명','').replace(/[.+]/g,'/').trim();
+      continue;
+    }
+    // 인원이 "명" 없이 앞에 시간/날짜 다 있고 숫자만 단독일 때 (드뭄) - 건너뜀
     remainLines.push(line);
   }
+  // remainLines에서 메모성 단어와 이름 분리
+  // 메모 키워드: 룸, 갈비, 홀, 한테이블, 유아의자, 대기, 취소, 변경, 도착 등
+  const MEMO_KW=/룸|갈비|홀|한테이블|테이블|유아|아기|의자|대기|취소|변경|도착|예정|입금|어른|소인|일반\d|매운\d|번방|예약/;
   if(remainLines.length>=1){
-    name=remainLines[0];
-    if(remainLines.length>=2) memo=remainLines.slice(1);
+    // 첫 줄이 메모 키워드면 이름이 따로 없을 수 있음 → 이름은 키워드 아닌 첫 줄
+    let nameIdx=remainLines.findIndex(l=>!MEMO_KW.test(l) && !/^\d/.test(l));
+    if(nameIdx<0) nameIdx=0;
+    name=remainLines[nameIdx];
+    memo=remainLines.filter((_,i)=>i!==nameIdx);
   }
   const errors=[];
   if(!timeStr)errors.push('시간');
@@ -1015,7 +1064,11 @@ async function loadChats(){
   try{
     const res=await fetch(API_URL+'?type=chats&t='+Date.now());
     const json=await res.json();
-    chatMessages=(json.chats||[]).map(c=>({id:Number(c.id),time:String(c.time),sender:String(c.sender),text:String(c.text)}));
+    chatMessages=(json.chats||[]).map(c=>{
+      const msg={id:Number(c.id),time:String(c.time),sender:String(c.sender),text:String(c.text)};
+      if(c.replyTo && String(c.replyTo).trim()) msg.replyTo=Number(c.replyTo);
+      return msg;
+    });
   }catch(e){
     try{const c=localStorage.getItem('sangmuok_chats');if(c)chatMessages=JSON.parse(c);}catch{}
   }
@@ -1067,14 +1120,175 @@ function scrollChatBottom(){
   });
 })();
 
+// ── 답장 기능 ─────────────────────────────────────────
+let replyTarget = null; // 답장 대상 메시지
+
+function startReply(msgId){
+  const m=chatMessages.find(x=>String(x.id)===String(msgId));
+  if(!m) return;
+  replyTarget=m;
+  document.getElementById('reply-bar-sender').textContent=m.sender;
+  document.getElementById('reply-bar-text').textContent=m.text.slice(0,50);
+  document.getElementById('reply-bar').classList.add('show');
+  document.getElementById('chat-input').focus();
+}
+function cancelReply(){
+  replyTarget=null;
+  document.getElementById('reply-bar').classList.remove('show');
+}
+
+// 원본 메시지에서 등록된 예약 찾기
+function findReservationFromMessage(msg){
+  const parsed=parseReservationText(msg.text);
+  if(parsed.error) return null;
+  const list=(reservations[parsed.dateKey]||{})[parsed.slot]||[];
+  // 이름+시간 우선, 없으면 이름만
+  let r=list.find(x=>x.name===parsed.name && x.time===parsed.timeLabel);
+  if(!r) r=list.find(x=>x.name===parsed.name);
+  return r ? {res:r, dateKey:parsed.dateKey, slot:parsed.slot} : null;
+}
+
+// 답장 텍스트에서 변경 내용 분석
+function analyzeChange(text){
+  const t=text.trim();
+  const changes={};
+  // 취소
+  if(/취소|캔슬|노쇼|안와|안 와|안옴/.test(t)){ changes.cancel=true; return changes; }
+  // 시간 변경
+  const timeMatch=t.match(/(\d{1,2}\s*시\s*\d{0,2}\s*분?|\d{1,2}:\d{2}|\d{1,2}\s*시\s*반?)/);
+  if(timeMatch && /변경|으로|로|바꿔|수정/.test(t)){
+    const to=parseTimeStr(timeMatch[1].replace(/\s/g,''));
+    if(to && to.h>=11 && to.h<22){ changes.time={h:to.h,m:to.m}; }
+  }else if(timeMatch && /시|:/.test(timeMatch[1])){
+    const to=parseTimeStr(timeMatch[1].replace(/\s/g,''));
+    if(to && to.h>=11 && to.h<22){ changes.time={h:to.h,m:to.m}; }
+  }
+  // 인원 변경: "8명", "총 9명", "3명 추가"
+  const addMatch=t.match(/(\d+)\s*명?\s*추가/);
+  const totalMatch=t.match(/총\s*(\d+)\s*명/);
+  const peopleMatch=t.match(/(\d+[.\/+]?\d*)\s*명/);
+  if(totalMatch){ changes.people=totalMatch[1]; }
+  else if(addMatch){ changes.peopleAdd=parseInt(addMatch[1]); }
+  else if(peopleMatch && /변경|으로|로|명$/.test(t)){ changes.people=peopleMatch[1].replace(/[.+]/g,'/'); }
+  // 테이블 변경
+  const tableMatch=t.match(/(\d{1,2}\s*[Tt]|[1-8]룸|홀)/);
+  if(tableMatch && /테이블|자리|[Tt]|룸|배치/.test(t)){ changes.table=tableMatch[1].replace(/\s/g,''); }
+  return changes;
+}
+
+// 답장으로 예약 수정 처리 (확인 팝업)
+function tryModifyByReply(replyMsg, replyText){
+  const found=findReservationFromMessage(replyMsg);
+  if(!found){
+    return false; // 원본 예약 못 찾음 → 일반 답장으로
+  }
+  const {res, dateKey, slot}=found;
+  const changes=analyzeChange(replyText);
+  if(Object.keys(changes).length===0) return false; // 변경 내용 없음 → 일반 답장
+
+  // 취소
+  if(changes.cancel){
+    if(confirm(`예약을 취소할까요?\n\n${res.name} ${res.time} ${res.people}명`)){
+      reservations[dateKey][slot]=reservations[dateKey][slot].filter(x=>x.id!==res.id);
+      saveToSheet();
+      const d=new Date(dateKey+'T00:00:00');
+      saveChat({id:Date.now(),time:new Date().toISOString(),sender:'시스템',
+        text:`❌ ${d.getMonth()+1}월 ${d.getDate()}일 · ${res.name} 예약 취소됨`});
+      render();renderChat();
+      return true;
+    }
+    return true; // 취소 눌렀어도 처리한 걸로
+  }
+
+  // 변경 요약
+  let summary=[], applied={};
+  if(changes.time){
+    const newLabel=`${pad(changes.time.h)}:${pad(changes.time.m)}`;
+    summary.push(`시간 ${res.time} → ${newLabel}`);
+    applied.time=newLabel; applied.timeH=changes.time.h; applied.newSlot=changes.time.h<16?'am':'pm';
+  }
+  if(changes.people){ summary.push(`인원 ${res.people}명 → ${changes.people}명`); applied.people=changes.people; }
+  if(changes.peopleAdd){
+    const cur=parseInt(String(res.people).split('/')[0])||0;
+    const nv=cur+changes.peopleAdd;
+    summary.push(`인원 ${res.people}명 → ${nv}명`); applied.people=String(nv);
+  }
+  if(changes.table){ summary.push(`테이블 ${res.table||'미배정'} → ${changes.table}`); applied.table=changes.table; }
+
+  if(summary.length===0) return false;
+
+  if(confirm(`예약을 수정할까요?\n\n${res.name}\n${summary.join('\n')}`)){
+    if(applied.time){ res.time=applied.time; res.timeH=applied.timeH;
+      // 시간대(오전/오후) 바뀌면 이동
+      if(applied.newSlot!==slot){
+        reservations[dateKey][slot]=reservations[dateKey][slot].filter(x=>x.id!==res.id);
+        if(!reservations[dateKey][applied.newSlot])reservations[dateKey][applied.newSlot]=[];
+        reservations[dateKey][applied.newSlot].push(res);
+      }
+    }
+    if(applied.people!==undefined) res.people=applied.people;
+    if(applied.table!==undefined) res.table=applied.table;
+    saveToSheet();
+    const d=new Date(dateKey+'T00:00:00');
+    saveChat({id:Date.now(),time:new Date().toISOString(),sender:'시스템',
+      text:`✏️ ${d.getMonth()+1}월 ${d.getDate()}일 · ${res.name} 수정: ${summary.join(', ')}`});
+    render();renderChat();
+  }
+  return true;
+}
+
+// 스와이프로 답장
+function attachSwipeReply(){
+  const box=document.getElementById('chat-messages');
+  if(!box) return;
+  box.querySelectorAll('.chat-msg').forEach(el=>{
+    let startX=0, startY=0, dragging=false;
+    el.addEventListener('touchstart',e=>{
+      startX=e.touches[0].clientX; startY=e.touches[0].clientY; dragging=true;
+    },{passive:true});
+    el.addEventListener('touchmove',e=>{
+      if(!dragging) return;
+      const dx=e.touches[0].clientX-startX;
+      const dy=e.touches[0].clientY-startY;
+      if(Math.abs(dy)>Math.abs(dx)){dragging=false;el.style.transform='';return;}
+      if(dx>0 && dx<80){ el.style.transform=`translateX(${dx}px)`; }
+    },{passive:true});
+    el.addEventListener('touchend',e=>{
+      if(!dragging) return;
+      dragging=false;
+      const dx=el.style.transform.match(/translateX\((\d+)/);
+      el.style.transform='';
+      if(dx && parseInt(dx[1])>50){
+        startReply(el.getAttribute('data-id'));
+      }
+    });
+    // PC: 더블클릭으로 답장
+    el.addEventListener('dblclick',()=>startReply(el.getAttribute('data-id')));
+  });
+}
+
 async function sendChat(){
   const input=document.getElementById('chat-input');
   const text=input.value.trim();
   if(!text) return;
+
+  // 답장이면 예약 수정/취소 먼저 시도
+  if(replyTarget){
+    const handled=tryModifyByReply(replyTarget, text);
+    if(handled){
+      input.value=''; input.style.height='auto';
+      cancelReply();
+      scrollChatBottom();
+      return;
+    }
+  }
+
   const now=new Date();
   const msg={id:Date.now(),time:now.toISOString(),sender:currentSender,text};
+  if(replyTarget) msg.replyTo=replyTarget.id;
   input.value='';
   input.style.height='auto';
+  cancelReply();
 
   await saveChat(msg);
   renderChat();
@@ -1157,8 +1371,17 @@ function renderChat(){
       const re=new RegExp('('+searchTerm.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','gi');
       textHtml=textHtml.replace(re,'<mark style="background:var(--am);color:#000">$1</mark>');
     }
-    html+=`<div class="chat-msg ${mine?'mine':''}" data-date="${dateStr}">
+    // 답장 인용 (이 메시지가 다른 메시지에 답장한 경우)
+    let quoteHtml='';
+    if(m.replyTo){
+      const orig=chatMessages.find(x=>x.id===m.replyTo);
+      if(orig){
+        quoteHtml=`<div class="chat-quote"><div class="chat-quote-sender">${escapeHtml(orig.sender)}</div><div class="chat-quote-text">${escapeHtml(orig.text.slice(0,40))}</div></div>`;
+      }
+    }
+    html+=`<div class="chat-msg ${mine?'mine':''}" data-date="${dateStr}" data-id="${m.id}">
       ${!mine?`<div class="chat-msg-sender">${escapeHtml(m.sender)}</div>`:''}
+      ${quoteHtml}
       <div class="chat-msg-text">${textHtml}</div>
       <div class="chat-msg-time">${timeStr}</div>
       ${parsedHtml}
@@ -1168,6 +1391,7 @@ function renderChat(){
     html='<div style="text-align:center;color:#444;font-size:13px;padding:40px 0">검색 결과가 없어요</div>';
   }
   box.innerHTML=html;
+  attachSwipeReply();
 }
 
 // 읽음 처리: 마지막 메시지를 읽음으로 표시
@@ -1419,7 +1643,11 @@ async function autoSync(){
     try{
       const res=await fetch(API_URL+'?type=chats&t='+Date.now());
       const json=await res.json();
-      const newChats=(json.chats||[]).map(c=>({id:Number(c.id),time:String(c.time),sender:String(c.sender),text:String(c.text)}));
+      const newChats=(json.chats||[]).map(c=>{
+        const msg={id:Number(c.id),time:String(c.time),sender:String(c.sender),text:String(c.text)};
+        if(c.replyTo && String(c.replyTo).trim()) msg.replyTo=Number(c.replyTo);
+        return msg;
+      });
       if(JSON.stringify(newChats)!==JSON.stringify(chatMessages)){
         const box=document.getElementById('chat-messages');
         const atBottom=box && (box.scrollHeight-box.scrollTop-box.clientHeight<60);
