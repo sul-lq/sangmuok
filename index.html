@@ -6,6 +6,8 @@
 <title>상무옥 예약관리</title>
 <link rel="manifest" href="./manifest.json">
 <meta name="theme-color" content="#0f0f0f">
+<meta name="description" content="상무옥 직원용 예약 및 메시지 관리 앱">
+<meta name="robots" content="noindex,nofollow">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="상무옥">
@@ -437,7 +439,7 @@ tbody td{padding:9px 10px;vertical-align:middle;}
 <div id="login-screen" style="display:none;position:fixed;inset:0;background:var(--bg);z-index:2000;flex-direction:column;align-items:center;justify-content:center;padding:24px;">
   <div style="font-size:24px;font-weight:700;margin-bottom:4px">상무<span style="color:var(--am)">옥</span></div>
   <div style="font-size:13px;color:var(--text-dim);margin-bottom:28px">예약관리 로그인</div>
-  <input id="login-id" placeholder="아이디" autocomplete="username" style="width:100%;max-width:280px;background:var(--surface);border:1px solid var(--border);border-radius:10px;color:var(--text);padding:13px 14px;font-size:15px;margin-bottom:10px;outline:none">
+  <input id="login-id" placeholder="이메일 또는 아이디" autocomplete="username" style="width:100%;max-width:280px;background:var(--surface);border:1px solid var(--border);border-radius:10px;color:var(--text);padding:13px 14px;font-size:15px;margin-bottom:10px;outline:none">
   <input id="login-pw" type="password" placeholder="비밀번호" autocomplete="current-password" style="width:100%;max-width:280px;background:var(--surface);border:1px solid var(--border);border-radius:10px;color:var(--text);padding:13px 14px;font-size:15px;margin-bottom:16px;outline:none">
   <button onclick="doLogin()" style="width:100%;max-width:280px;background:var(--green);color:#000;border:none;border-radius:10px;padding:14px;font-size:15px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif">로그인</button>
   <div id="login-error" style="color:var(--accent);font-size:13px;margin-top:12px;min-height:18px"></div>
@@ -455,17 +457,19 @@ tbody td{padding:9px 10px;vertical-align:middle;}
 <!-- 예약 입력 플로팅 버튼 (오전/오후 탭에서만) -->
 <button class="fab-add" id="fab-add" onclick="openInputSheet()">+</button>
 
+<script src="./vendor/supabase-2.108.1.min.js"></script>
+<script src="./supabase-config.js"></script>
+<script src="./supabase-store.js"></script>
 <script>
 // ── 상태 ─────────────────────────────────────────────
-const API_URL = 'https://script.google.com/macros/s/AKfycbzMIn9nXkSpAKb_j4cMP2hq3di2fZu8Nrkqpe3CZk71vf-2m9YYMQdlUCEp9tYnYP7B/exec';
-
 let currentTab='am', currentDateKey=todayKey(), reservations={}, parsed=null;
 let isSyncing=false;
+let syncRequested=false;
 
 function todayKey(){const d=new Date();return`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;}
 function pad(n){return String(n).padStart(2,'0');}
 
-// ── 구글 시트 연동 ────────────────────────────────────
+// ── Supabase 연동 ─────────────────────────────────────
 function showSyncStatus(msg, color='#888'){
   let el=document.getElementById('sync-status');
   if(!el){
@@ -483,46 +487,8 @@ function showSyncStatus(msg, color='#888'){
 async function loadFromSheet(){
   showSyncStatus('불러오는 중...');
   try{
-    const res = await fetch(API_URL + '?t=' + Date.now());
-    const json = await res.json();
-    reservations = {};
-    (json.data || []).forEach(raw => {
-      const row = {};
-      Object.keys(raw).forEach(k => row[k.toLowerCase()] = raw[k]);
-
-      const dateKey = String(row.datekey || '').trim();
-      const slot = String(row.slot || '').trim();
-      if(!dateKey || !slot) return;
-
-      let timeH = Number(row.timeh);
-      let timeStr = String(row.time || '');
-      let mm = 0;
-      if(/^\d{1,2}:\d{2}/.test(timeStr)){
-        const parts = timeStr.split(':');
-        timeH = Number(parts[0]);
-        mm = Number(parts[1]);
-      } else if(timeStr.includes('T')){
-        const d = new Date(timeStr);
-        if(!isNaN(d)) mm = d.getUTCMinutes();
-      }
-      if(isNaN(timeH)) timeH = 12;
-      const timeLabel = `${pad(timeH)}:${pad(mm)}`;
-
-      if(!reservations[dateKey]) reservations[dateKey] = {am:[], pm:[]};
-      reservations[dateKey][slot].push({
-        id: Number(row.id),
-        time: timeLabel,
-        timeH: timeH,
-        name: String(row.name || ''),
-        people: String(row.people || ''),
-        memo: String(row.memo || ''),
-        table: String(row.table || '')
-      });
-    });
-    Object.values(reservations).forEach(s=>{
-      s.am.sort((a,b)=>a.time.localeCompare(b.time));
-      s.pm.sort((a,b)=>a.time.localeCompare(b.time));
-    });
+    reservations = await SangmuokDB.loadReservations();
+    try{localStorage.setItem('sangmuok_v2',JSON.stringify(reservations));}catch{}
     showSyncStatus('✓ 동기화 완료', '#52c87a');
   } catch(e) {
     try{const c=localStorage.getItem('sangmuok_v2');if(c)reservations=JSON.parse(c);}catch{}
@@ -533,31 +499,26 @@ async function loadFromSheet(){
 }
 
 async function saveToSheet(){
-  if(isSyncing) return;
+  if(isSyncing){
+    syncRequested=true;
+    return;
+  }
   isSyncing=true;
   showSyncStatus('저장 중...');
   // 로컬 캐시에도 저장
   try{localStorage.setItem('sangmuok_v2',JSON.stringify(reservations));}catch{}
   try{
-    const rows=[];
-    Object.entries(reservations).forEach(([dateKey,slots])=>{
-      ['am','pm'].forEach(slot=>{
-        (slots[slot]||[]).forEach(r=>{
-          rows.push({id:r.id, datekey:dateKey, dateKey:dateKey, slot, time:r.time, timeh:r.timeH, timeH:r.timeH, name:r.name, people:r.people, memo:r.memo, table:r.table});
-        });
-      });
-    });
-    await fetch(API_URL,{
-      method:'POST',
-      mode:'no-cors',
-      headers:{'Content-Type':'text/plain'},
-      body:JSON.stringify({action:'save',rows}),
-    });
+    await SangmuokDB.syncReservations(reservations);
     showSyncStatus('✓ 저장 완료','#52c87a');
   }catch(e){
-    showSyncStatus('✓ 로컬 저장됨','#d4a853');
+    console.error(e);
+    showSyncStatus('저장 실패 · 로컬 보관','#e85d4a');
   }
   isSyncing=false;
+  if(syncRequested){
+    syncRequested=false;
+    saveToSheet();
+  }
 }
 
 // ── 날짜 ─────────────────────────────────────────────
@@ -674,6 +635,8 @@ function parseReservationText(raw){
     .replace(/(\d{1,2})\s*[푼뷴]/g, '$1분');
   // 붙어있는 토큰 분리
   normalized = normalized
+    .replace(/(\d{1,2})월\s+(\d{1,2})일/g, '$1/$2')
+    .replace(/(오전|오후)\s+(\d{1,2}\s*(?:시|:\d{2}))/g, '$1$2')
     .replace(/(\d{1,2}\s*시\s*\d{1,2}\s*분)(\d{1,2}\/?\d*명)/g, '$1 $2')
     .replace(/(\d{1,2}\s*시\s*반)(\d{1,2}\/?\d*명)/g, '$1 $2')
     .replace(/(\d{1,2}\s*시\s*\d{1,2})(명)/g, '$1$2')
@@ -728,7 +691,7 @@ function parseReservationText(raw){
       dateKey=`${y}-${pad(mo+1)}-${pad(day)}`;continue;
     }
     // 시간 토큰 (12시, 12시30, 12시30분, 12:30, 6시반)
-    if(!timeStr && /^\d{1,2}\s*(시|:)/.test(line) || (!timeStr && /\d/.test(line) && (line.includes('분뒤')||line.includes('분후')||line.includes('시간뒤')||line.includes('시간후')))){
+    if(!timeStr && /^(오전|오후)?\d{1,2}\s*(시|:)/.test(line) || (!timeStr && /\d/.test(line) && (line.includes('분뒤')||line.includes('분후')||line.includes('시간뒤')||line.includes('시간후')))){
       timeStr=line;
       // 다음 토큰이 "30분" 또는 "30"(분단독)이면 시간에 흡수 (11시 30분 / 11시 30)
       if(li+1<workLines.length && /^\d{1,2}분?$/.test(workLines[li+1]) && line.includes('시') && !/\d시\d/.test(line) && !line.includes('분')){
@@ -776,10 +739,10 @@ function parseInput(){
   const d=new Date(result.dateKey+'T00:00:00');const days=['일','월','화','수','목','금','토'];
   preview.innerHTML=`
     <div class="pv-row"><span class="pv-label">날짜</span><span class="pv-val">${d.getMonth()+1}/${d.getDate()} (${days[d.getDay()]})</span></div>
-    <div class="pv-row"><span class="pv-label">시간</span><span class="pv-val pv-time-${result.slot}">${result.timeLabel} · ${result.slot==='am'?'오전':'오후'}</span></div>
-    <div class="pv-row"><span class="pv-label">예약자</span><span class="pv-val">${result.name}</span></div>
-    <div class="pv-row"><span class="pv-label">인원</span><span class="pv-val">${result.people||'-'}명</span></div>
-    ${result.memo?`<div class="pv-row"><span class="pv-label">메모</span><span class="pv-val">${result.memo}</span></div>`:''}`;
+    <div class="pv-row"><span class="pv-label">시간</span><span class="pv-val pv-time-${result.slot}">${escapeHtml(result.timeLabel)} · ${result.slot==='am'?'오전':'오후'}</span></div>
+    <div class="pv-row"><span class="pv-label">예약자</span><span class="pv-val">${escapeHtml(result.name)}</span></div>
+    <div class="pv-row"><span class="pv-label">인원</span><span class="pv-val">${escapeHtml(result.people||'-')}명</span></div>
+    ${result.memo?`<div class="pv-row"><span class="pv-label">메모</span><span class="pv-val">${escapeHtml(result.memo)}</span></div>`:''}`;
   parsed=result;
   btn.disabled=false;
 }
@@ -811,7 +774,7 @@ function deleteRow(dateKey,slot,id){
   reservations[dateKey][slot]=reservations[dateKey][slot].filter(r=>String(r.id)!==String(id));
   try{localStorage.setItem('sangmuok_v2',JSON.stringify(reservations));}catch{}
   render();
-  // 삭제 동안 autoSync 차단 (시트 동기화 완료 대기)
+  // 삭제 저장 중에는 실시간 재조회로 항목이 잠시 복원되지 않도록 차단
   autoSyncPaused=true;
   saveToSheet();
   setTimeout(()=>{autoSyncPaused=false;},10000);
@@ -879,8 +842,8 @@ function tblHTML(num){
   const b=getBookings(num);
   const cls=cellClass(num);
   let chips='';
-  b.am.forEach(r=>{chips+=`<div class="booking-chip chip-am">${r.time} ${escapeHtml(r.name)}</div>`;});
-  b.pm.forEach(r=>{chips+=`<div class="booking-chip chip-pm">${r.time} ${escapeHtml(r.name)}</div>`;});
+  b.am.forEach(r=>{chips+=`<div class="booking-chip chip-am">${escapeHtml(r.time)} ${escapeHtml(r.name)}</div>`;});
+  b.pm.forEach(r=>{chips+=`<div class="booking-chip chip-pm">${escapeHtml(r.time)} ${escapeHtml(r.name)}</div>`;});
   // 이동 모드: 출발 테이블 강조, 다른 테이블은 선택 대상
   if(moveMode){
     const isFrom = String(moveMode.fromTable)===String(num);
@@ -903,9 +866,9 @@ function showTableDetail(tNum){
   function rowHtml(r,slot){
     const cls=slot==='am'?'popup-time-am':'popup-time-pm';
     return `<div class="popup-row">
-      <span class="${cls}">${r.time}</span>
+      <span class="${cls}">${escapeHtml(r.time)}</span>
       <span class="popup-name">${escapeHtml(r.name)}</span>
-      <span class="popup-people">${r.people?r.people+'명':''}</span>
+      <span class="popup-people">${r.people?escapeHtml(r.people)+'명':''}</span>
       <button onclick='startMove("${r.dateKey||currentDateKey}","${slot}","${r.id}",${tNum})' style="margin-left:8px;background:var(--am);color:#000;border:none;border-radius:6px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer">이동</button>
     </div>${r.memo?`<div class="popup-memo" style="padding:2px 0 6px 58px;">${escapeHtml(r.memo)}</div>`:''}`;
   }
@@ -1109,11 +1072,11 @@ function render(){
     return;
   }
   const rows=list.map(r=>`<tr>
-    <td class="td-time ${cc}">${r.time}</td>
-    <td class="td-name">${r.name}</td>
-    <td class="td-people">${r.people?r.people+'명':'-'}</td>
-    <td><input class="td-table-input" value="${r.table}" placeholder="미배정" onchange="updateTable('${currentDateKey}','${cc}',${r.id},this.value)" onclick="event.stopPropagation()"></td>
-    <td class="td-memo">${r.memo||''}</td>
+    <td class="td-time ${cc}">${escapeHtml(r.time)}</td>
+    <td class="td-name">${escapeHtml(r.name)}</td>
+    <td class="td-people">${r.people?escapeHtml(r.people)+'명':'-'}</td>
+    <td><input class="td-table-input" value="${escapeHtml(r.table)}" placeholder="미배정" onchange="updateTable('${currentDateKey}','${cc}',${r.id},this.value)" onclick="event.stopPropagation()"></td>
+    <td class="td-memo">${escapeHtml(r.memo)}</td>
     <td><button class="btn-del" onclick="deleteRow('${currentDateKey}','${cc}',${r.id})">✕</button></td>
   </tr>`).join('');
   panel.innerHTML=`
@@ -1143,13 +1106,8 @@ function saveDeletedIds(){
 let lastReadId = (()=>{try{const v=localStorage.getItem('sangmuok_lastread');return v?Number(v):null;}catch{return null;}})();
 
 // ── 로그인 ────────────────────────────────────────────
-let currentUser = loadUser();   // {id, name}
-let currentSender = currentUser ? currentUser.name : '';
-
-function loadUser(){
-  try{const u=localStorage.getItem('sangmuok_user');if(u)return JSON.parse(u);}catch{}
-  return null;
-}
+let currentUser = null;
+let currentSender = '';
 
 async function doLogin(){
   const id=document.getElementById('login-id').value.trim();
@@ -1158,26 +1116,31 @@ async function doLogin(){
   if(!id||!pw){err.textContent='아이디와 비밀번호를 입력하세요';return;}
   err.textContent='확인 중...';
   try{
-    const res=await fetch(API_URL+'?type=users&t='+Date.now());
-    const json=await res.json();
-    const user=(json.users||[]).find(u=>String(u.id)===id && String(u.pw)===pw);
-    if(!user){err.textContent='아이디 또는 비밀번호가 틀렸어요';return;}
-    currentUser={id:user.id, name:user.name};
-    currentSender=user.name;
-    try{localStorage.setItem('sangmuok_user',JSON.stringify(currentUser));}catch{}
-    document.getElementById('login-screen').style.display='none';
-    document.getElementById('my-profile').textContent=user.name;
-    renderChat();
+    const user=await SangmuokDB.signIn(id,pw);
+    await activateUser(user);
   }catch(e){
-    err.textContent='연결 오류. 다시 시도하세요';
+    console.error(e);
+    err.textContent='아이디 또는 비밀번호를 확인하세요';
   }
 }
 
-function logout(){
+async function logout(){
   if(!confirm('로그아웃 할까요?')) return;
+  try{await SangmuokDB.signOut();}catch(e){console.error(e);}
   currentUser=null;currentSender='';
   try{localStorage.removeItem('sangmuok_user');}catch{}
   showLoginScreen();
+}
+
+async function activateUser(user){
+  currentUser=user;
+  currentSender=user.name;
+  try{localStorage.setItem('sangmuok_user',JSON.stringify(user));}catch{}
+  document.getElementById('login-screen').style.display='none';
+  document.getElementById('my-profile').textContent=user.name;
+  await Promise.all([loadFromSheet(),loadChats()]);
+  SangmuokDB.subscribe(()=>autoSync());
+  renderChat();
 }
 
 function showLoginScreen(){
@@ -1207,15 +1170,9 @@ function searchChat(){
 
 async function loadChats(){
   try{
-    const res=await fetch(API_URL+'?type=chats&t='+Date.now());
-    const json=await res.json();
-    chatMessages=(json.chats||[])
-      .filter(c=>!deletedChatIds.has(String(c.id)))
-      .map(c=>{
-        const msg={id:Number(c.id),time:String(c.time),sender:String(c.sender),text:String(c.text)};
-        if(c.replyTo && String(c.replyTo).trim()) msg.replyTo=Number(c.replyTo);
-        return msg;
-      });
+    const loaded=await SangmuokDB.loadMessages();
+    chatMessages=loaded.filter(c=>!deletedChatIds.has(String(c.id)));
+    try{localStorage.setItem('sangmuok_chats',JSON.stringify(chatMessages));}catch{}
   }catch(e){
     try{const c=localStorage.getItem('sangmuok_chats');if(c){
       const all=JSON.parse(c);
@@ -1226,13 +1183,16 @@ async function loadChats(){
 }
 
 function saveChat(msg){
-  // 로컬 저장
   try{localStorage.setItem('sangmuok_chats',JSON.stringify(chatMessages));}catch{}
-  // 시트 저장은 백그라운드 (기다리지 않음 - 화면 딜레이 없음)
-  fetch(API_URL,{
-    method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain'},
-    body:JSON.stringify({action:'saveChat',chat:msg})
-  }).catch(()=>{});
+  SangmuokDB.saveMessage(msg).then(saved=>{
+    const index=chatMessages.indexOf(msg);
+    if(index>=0) chatMessages[index]=saved;
+    try{localStorage.setItem('sangmuok_chats',JSON.stringify(chatMessages));}catch{}
+    renderChat();
+  }).catch(e=>{
+    console.error(e);
+    showBanner('메시지 저장에 실패했어요');
+  });
 }
 
 function scrollChatBottom(){
@@ -1451,20 +1411,23 @@ function askDeleteChat(msgId){
   }
 }
 
-function deleteChat(msgId){
+async function deleteChat(msgId){
   const id=String(msgId);
   deletedChatIds.add(id);
   saveDeletedIds();
   chatMessages=chatMessages.filter(x=>String(x.id)!==id);
   try{localStorage.setItem('sangmuok_chats',JSON.stringify(chatMessages));}catch{}
   renderChat();
-  // 시트 삭제 요청 (no-cors라 응답 확인 불가 - 넉넉히 10초 sync 차단)
   autoSyncPaused=true;
-  fetch(API_URL,{
-    method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain'},
-    body:JSON.stringify({action:'deleteChat',id:msgId})
-  }).catch(()=>{});
-  setTimeout(()=>{autoSyncPaused=false;},10000);
+  try{
+    await SangmuokDB.deleteMessage(msgId);
+  }catch(e){
+    console.error(e);
+    showBanner('메시지 삭제에 실패했어요');
+    await loadChats();
+  }finally{
+    autoSyncPaused=false;
+  }
 }
 
 async function sendChat(){
@@ -1499,7 +1462,7 @@ async function sendChat(){
   renderChat();
   scrollChatBottom();
 
-  // 시트 저장 (백그라운드)
+  // DB 저장 (백그라운드)
   saveChat(msg);
 
   // 파싱 시도
@@ -1565,7 +1528,7 @@ function renderChat(){
       const rd=new Date(result.dateKey+'T00:00:00');
       const registered = registeredMsgIds.has(m.id) || isAlreadyReserved(result);
       parsedHtml=`<div class="chat-msg-parsed">
-        <div class="chat-parsed-info">📋 <b>${rd.getMonth()+1}/${rd.getDate()}</b> ${result.timeLabel} · <b>${result.name}</b> ${result.people?result.people+'명':''} ${result.memo?'· '+result.memo:''}</div>
+        <div class="chat-parsed-info">📋 <b>${rd.getMonth()+1}/${rd.getDate()}</b> ${escapeHtml(result.timeLabel)} · <b>${escapeHtml(result.name)}</b> ${result.people?escapeHtml(result.people)+'명':''} ${result.memo?'· '+escapeHtml(result.memo):''}</div>
         ${registered
           ? `<button class="chat-register-btn done">✓ 등록됨</button>`
           : `<button class="chat-register-btn" onclick='doRegisterFromChatById(${m.id})'>예약 등록</button>`}
@@ -1605,6 +1568,7 @@ function markAsRead(){
   if(chatMessages.length){
     lastReadId=chatMessages[chatMessages.length-1].id;
     try{localStorage.setItem('sangmuok_lastread',String(lastReadId));}catch{}
+    SangmuokDB.markRead(lastReadId);
   }
 }
 
@@ -1633,7 +1597,12 @@ function isAlreadyReserved(result){
 }
 
 function escapeHtml(s){
-  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  return String(s??'')
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;')
+    .replace(/'/g,'&#39;');
 }
 
 // 엔터 처리: 모바일은 줄바꿈, PC는 Enter 전송 (Shift+Enter 줄바꿈)
@@ -1731,11 +1700,11 @@ function exportExcel(){
     let html='';
     list.forEach(r=>{
       html+=`<tr>
-        <td>${r.table||''}</td>
-        <td>${r.time||''}</td>
-        <td>${r.name||''}</td>
-        <td style="text-align:center">${r.people||''}</td>
-        <td>${r.memo||''}</td>
+        <td>${escapeHtml(r.table)}</td>
+        <td>${escapeHtml(r.time)}</td>
+        <td>${escapeHtml(r.name)}</td>
+        <td style="text-align:center">${escapeHtml(r.people)}</td>
+        <td>${escapeHtml(r.memo)}</td>
       </tr>`;
     });
     // 남은 빈 줄 (수기 작성용)
@@ -1797,16 +1766,19 @@ function exportExcel(){
 // ── 초기화 ────────────────────────────────────────────
 updateDateLabel();
 render(); // 먼저 화면 표시
-loadFromSheet(); // 이후 시트 동기화
-loadChats(); // 채팅 불러오기
 switchTab('chat'); // 앱 열면 채팅방 먼저
 
-// 로그인 체크
-if(currentUser){
-  document.getElementById('my-profile').textContent=currentUser.name;
-}else{
-  showLoginScreen();
+async function bootstrapApp(){
+  try{
+    const user=await SangmuokDB.getCurrentUser();
+    if(user) await activateUser(user);
+    else showLoginScreen();
+  }catch(e){
+    console.error(e);
+    showLoginScreen();
+  }
 }
+bootstrapApp();
 
 // ── 캘린더 ────────────────────────────────────────────
 let calYear, calMonth;
@@ -1874,30 +1846,10 @@ async function autoSync(){
   if(isUserTyping() || isSyncing || autoSyncPaused) return;
   // 캘린더 열려있으면 건너뜀
   if(document.getElementById('cal-popup').style.display!=='none') return;
+  if(!currentUser) return;
 
   try{
-    const res=await fetch(API_URL+'?t='+Date.now());
-    const json=await res.json();
-    const newRes={};
-    (json.data||[]).forEach(raw=>{
-      const row={};
-      Object.keys(raw).forEach(k=>row[k.toLowerCase()]=raw[k]);
-      const dateKey=String(row.datekey||'').trim();
-      const slot=String(row.slot||'').trim();
-      if(!dateKey||!slot) return;
-      let timeH=Number(row.timeh);
-      let timeStr=String(row.time||'');
-      let mm=0;
-      if(/^\d{1,2}:\d{2}/.test(timeStr)){const p=timeStr.split(':');timeH=Number(p[0]);mm=Number(p[1]);}
-      else if(timeStr.includes('T')){const d=new Date(timeStr);if(!isNaN(d))mm=d.getUTCMinutes();}
-      if(isNaN(timeH))timeH=12;
-      if(!newRes[dateKey])newRes[dateKey]={am:[],pm:[]};
-      newRes[dateKey][slot].push({id:Number(row.id),time:`${pad(timeH)}:${pad(mm)}`,timeH,name:String(row.name||''),people:String(row.people||''),memo:String(row.memo||''),table:String(row.table||'')});
-    });
-    Object.values(newRes).forEach(s=>{
-      s.am.sort((a,b)=>a.time.localeCompare(b.time));
-      s.pm.sort((a,b)=>a.time.localeCompare(b.time));
-    });
+    const newRes=await SangmuokDB.loadReservations();
     // 변경 있을 때만 갱신 (화면 깜빡임 최소화)
     const changed=JSON.stringify(newRes)!==JSON.stringify(reservations);
     if(changed){
@@ -1911,15 +1863,8 @@ async function autoSync(){
   // 채팅도 갱신
   if(currentTab==='chat'){
     try{
-      const res=await fetch(API_URL+'?type=chats&t='+Date.now());
-      const json=await res.json();
-      const newChats=(json.chats||[])
-        .filter(c=>!deletedChatIds.has(String(c.id))) // 삭제된 메시지 제외
-        .map(c=>{
-          const msg={id:Number(c.id),time:String(c.time),sender:String(c.sender),text:String(c.text)};
-          if(c.replyTo && String(c.replyTo).trim()) msg.replyTo=Number(c.replyTo);
-          return msg;
-        });
+      const loaded=await SangmuokDB.loadMessages();
+      const newChats=loaded.filter(c=>!deletedChatIds.has(String(c.id)));
       if(JSON.stringify(newChats)!==JSON.stringify(chatMessages)){
         const box=document.getElementById('chat-messages');
         const atBottom=box && (box.scrollHeight-box.scrollTop-box.clientHeight<60);
