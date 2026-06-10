@@ -4,26 +4,26 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, interactive-widget=resizes-content">
 <title>상무옥 예약관리</title>
-<link rel="manifest" href="./manifest.json">
-<meta name="theme-color" content="#0f0f0f">
+<link rel="manifest" href="./manifest.json?v=6">
+<meta name="theme-color" content="#f7f5f1">
 <meta name="description" content="상무옥 직원용 예약 및 메시지 관리 앱">
 <meta name="robots" content="noindex,nofollow">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="상무옥">
 <link rel="apple-touch-icon" href="./icon-192.png">
 <style>
 :root{
-  --bg:#0f0f0f;--surface:#1a1a1a;--surface2:#242424;--border:#2e2e2e;
-  --am:#d4a853;--am-dim:#2a200a;--pm:#5b8fd4;--pm-dim:#0a1528;
-  --text:#e8e8e8;--text-dim:#888;--accent:#e85d4a;--green:#52c87a;
+  --bg:#f7f5f1;--surface:#ffffff;--surface2:#efebe5;--border:#dcd6ce;
+  --am:#785445;--am-dim:#f1e9e4;--pm:#53636a;--pm-dim:#e8edef;
+  --text:#24211e;--text-dim:#716b64;--accent:#a5473d;--green:#405b4d;
 }
 *{box-sizing:border-box;margin:0;padding:0;}
-body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;min-height:100dvh;}
+body{background:var(--bg);color:var(--text);font-family:'Noto Sans KR',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;min-height:100dvh;letter-spacing:-.01em;}
 
 /* 헤더 */
-header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;position:sticky;top:0;background:var(--bg);z-index:100;}
-.logo img{height:36px;filter:invert(1);mix-blend-mode:screen;}
+header{padding:12px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;position:sticky;top:0;background:rgba(247,245,241,.96);z-index:100;box-shadow:0 2px 12px rgba(61,47,38,.04);backdrop-filter:blur(10px);}
+.logo img{height:40px;display:block;mix-blend-mode:multiply;}
 .date-nav{display:flex;align-items:center;gap:6px;margin-left:auto;}
 .date-nav button{background:var(--surface);border:1px solid var(--border);color:var(--text);width:30px;height:30px;border-radius:6px;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;touch-action:manipulation;}
 .date-nav button:active{background:var(--surface2);}
@@ -34,11 +34,11 @@ header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;alig
 .tab{padding:8px 16px;border-radius:8px 8px 0 0;font-size:13px;font-weight:500;cursor:pointer;border:1px solid transparent;border-bottom:none;color:var(--text-dim);background:transparent;white-space:nowrap;touch-action:manipulation;}
 .tab.am.active{background:var(--am-dim);border-color:var(--am);color:var(--am);}
 .tab.pm.active{background:var(--pm-dim);border-color:var(--pm);color:var(--pm);}
-.tab.map.active{background:#1a1a2e;border-color:#a78bfa;color:#a78bfa;}
-.tab.chat.active{background:#0a2818;border-color:var(--green);color:var(--green);}
+.tab.map.active{background:#ece9e4;border-color:#5e5750;color:#403b36;}
+.tab.chat.active{background:#e6ece8;border-color:var(--green);color:var(--green);}
 .tab-badge{display:inline-block;background:var(--surface2);border-radius:10px;padding:1px 6px;font-size:11px;margin-left:5px;font-family:'DM Mono',monospace;}
-.tab.am.active .tab-badge{background:var(--am);color:#000;}
-.tab.pm.active .tab-badge{background:var(--pm);color:#000;}
+.tab.am.active .tab-badge{background:var(--am);color:#fff;}
+.tab.pm.active .tab-badge{background:var(--pm);color:#fff;}
 
 /* ── 채팅 패널 ── */
 .chat-panel{flex:1;display:none;flex-direction:column;height:100%;position:relative;}
@@ -47,15 +47,15 @@ header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;alig
 .chat-date-divider{text-align:center;font-size:11px;color:var(--text-dim);margin:8px 0;}
 .chat-date-divider span{background:var(--surface2);padding:3px 12px;border-radius:10px;}
 /* 스크롤 시 상단 떠있는 날짜 */
-.chat-floating-date{position:absolute;top:8px;left:50%;transform:translateX(-50%);background:rgba(40,40,40,.92);color:#ddd;font-size:11px;padding:4px 14px;border-radius:12px;z-index:20;pointer-events:none;opacity:0;transition:opacity .2s;backdrop-filter:blur(4px);}
+.chat-floating-date{position:absolute;top:8px;left:50%;transform:translateX(-50%);background:rgba(55,50,45,.9);color:#fff;font-size:11px;padding:4px 14px;border-radius:12px;z-index:20;pointer-events:none;opacity:0;transition:opacity .2s;backdrop-filter:blur(4px);}
 .chat-floating-date.show{opacity:1;}
 /* 읽음 구분선 */
 .chat-read-divider{display:flex;align-items:center;gap:8px;margin:6px 0;color:#e85d4a;font-size:11px;}
 .chat-read-divider::before,.chat-read-divider::after{content:'';flex:1;height:1px;background:rgba(232,93,74,.4);}
 .chat-msg{max-width:75%;align-self:flex-start;background:var(--surface2);border-radius:4px 14px 14px 14px;padding:10px 13px;position:relative;transition:transform .15s;touch-action:pan-y;}
-.chat-msg.mine{align-self:flex-end;background:#2a3f2f;border-radius:14px 4px 14px 14px;}
+.chat-msg.mine{align-self:flex-end;background:#dfe8e2;border:1px solid #cad8cf;border-radius:14px 4px 14px 14px;}
 /* 답장 인용 (메시지 안) */
-.chat-quote{border-left:3px solid var(--am);padding:4px 8px;margin-bottom:6px;background:rgba(255,255,255,.05);border-radius:4px;font-size:12px;}
+.chat-quote{border-left:3px solid var(--am);padding:4px 8px;margin-bottom:6px;background:rgba(120,84,69,.07);border-radius:4px;font-size:12px;}
 .chat-quote-sender{color:var(--am);font-weight:700;font-size:10px;}
 .chat-quote-text{color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 /* 답장 화살표 (스와이프 시 나타남) */
@@ -71,10 +71,10 @@ header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;alig
 .chat-msg.mine .chat-msg-sender{color:var(--green);}
 .chat-msg-text{font-size:14px;line-height:1.5;white-space:pre-wrap;word-break:break-word;}
 .chat-msg-time{font-size:9px;color:var(--text-dim);margin-top:4px;text-align:right;}
-.chat-msg-parsed{margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,.1);font-size:11px;}
+.chat-msg-parsed{margin-top:8px;padding-top:8px;border-top:1px solid rgba(36,33,30,.1);font-size:11px;}
 .chat-parsed-info{color:var(--text-dim);line-height:1.6;}
 .chat-parsed-info b{color:var(--text);}
-.chat-register-btn{margin-top:6px;background:var(--green);color:#000;border:none;border-radius:6px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;width:100%;font-family:'Noto Sans KR',sans-serif;}
+.chat-register-btn{margin-top:6px;background:var(--green);color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;width:100%;font-family:'Noto Sans KR',sans-serif;}
 .chat-register-btn.done{background:var(--surface);color:var(--text-dim);cursor:default;}
 .chat-input-bar{
   padding:10px 12px calc(10px + env(safe-area-inset-bottom)) 12px;
@@ -130,7 +130,7 @@ header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;alig
   flex:0 0 56px;
   border-radius:50%;
   background:var(--green);
-  color:#000;
+  color:#fff;
   display:flex;
   align-items:center;
   justify-content:center;
@@ -160,7 +160,7 @@ header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;alig
   font-weight:900;
   line-height:1;
   transform:translateY(-2px);
-  color:#000;
+  color:#fff;
   pointer-events:none;
 }
 .chat-send-btn *{
@@ -183,18 +183,18 @@ header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;alig
 .chat-sender-select span{font-size:11px;color:var(--text-dim);}
 .profile-name-btn{background:none;border:none;color:var(--green);font-size:12px;font-weight:700;cursor:pointer;padding:3px 2px;font-family:'Noto Sans KR',sans-serif;}
 .chat-sender-btn{background:var(--surface);border:1px solid var(--border);color:var(--text-dim);border-radius:14px;padding:4px 12px;font-size:12px;cursor:pointer;font-family:'Noto Sans KR',sans-serif;}
-.chat-sender-btn.active{background:var(--green);color:#000;border-color:var(--green);font-weight:700;}
+.chat-sender-btn.active{background:var(--green);color:#fff;border-color:var(--green);font-weight:700;}
 .chat-auto-toggle{margin-left:auto;display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-dim);cursor:pointer;}
 
 /* 예약 입력 플로팅 버튼 */
-.fab-add{position:fixed;right:20px;bottom:20px;width:56px;height:56px;border-radius:50%;background:var(--green);color:#000;border:none;font-size:28px;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.5);z-index:90;display:none;align-items:center;justify-content:center;line-height:1;}
+.fab-add{position:fixed;right:20px;bottom:20px;width:56px;height:56px;border-radius:50%;background:var(--green);color:#fff;border:none;font-size:28px;cursor:pointer;box-shadow:0 8px 24px rgba(51,67,57,.24);z-index:90;display:none;align-items:center;justify-content:center;line-height:1;}
 .fab-add.show{display:flex;}
 /* 입력 바텀시트 오버레이 */
 .input-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:300;}
 .input-overlay.show{display:block;}
 .input-sheet{position:fixed;left:0;right:0;bottom:0;background:var(--surface);border-radius:18px 18px 0 0;z-index:301;padding:18px 18px 28px;transform:translateY(100%);transition:transform .25s;max-height:85vh;overflow-y:auto;}
 .input-sheet.show{transform:translateY(0);}
-.input-sheet-handle{width:40px;height:4px;background:#444;border-radius:2px;margin:0 auto 16px;}
+.input-sheet-handle{width:40px;height:4px;background:#c7c0b8;border-radius:2px;margin:0 auto 16px;}
 
 
 /* 메인 레이아웃 - dvh로 키보드 대응 */
@@ -205,19 +205,19 @@ header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;alig
 .input-panel.hidden{display:none;}
 .panel-title{font-size:10px;font-weight:700;letter-spacing:1.5px;color:var(--text-dim);text-transform:uppercase;}
 textarea{background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'DM Mono',monospace;font-size:13px;line-height:1.7;padding:12px;resize:none;height:140px;width:100%;outline:none;}
-textarea:focus{border-color:#555;}
-textarea::placeholder{color:#444;}
+textarea:focus{border-color:#8c8178;box-shadow:0 0 0 3px rgba(120,84,69,.08);}
+textarea::placeholder{color:#a39b93;}
 .preview-box{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:11px;font-size:12px;min-height:72px;}
 .preview-box .pv-row{display:flex;justify-content:space-between;padding:2px 0;}
 .preview-box .pv-label{color:var(--text-dim);}
 .preview-box .pv-val{font-weight:500;font-family:'DM Mono',monospace;}
 .pv-time-am{color:var(--am);}.pv-time-pm{color:var(--pm);}
-.preview-box .empty{color:#444;font-size:12px;text-align:center;padding:12px 0;}
+.preview-box .empty{color:#9a928a;font-size:12px;text-align:center;padding:12px 0;}
 .preview-error{color:var(--accent);font-size:12px;padding:4px 0;}
-.btn-add{background:var(--green);color:#000;border:none;border-radius:8px;padding:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;touch-action:manipulation;}
+.btn-add{background:var(--green);color:#fff;border:none;border-radius:8px;padding:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;touch-action:manipulation;}
 .btn-add:disabled{background:var(--surface2);color:var(--text-dim);cursor:not-allowed;}
-.hint{font-size:11px;color:#555;line-height:1.8;border-top:1px solid var(--border);padding-top:10px;}
-.hint strong{color:#777;display:block;margin-bottom:3px;}
+.hint{font-size:11px;color:#817a73;line-height:1.8;border-top:1px solid var(--border);padding-top:10px;}
+.hint strong{color:#5f5953;display:block;margin-bottom:3px;}
 
 /* ── 예약 리스트 ── */
 .table-panel{flex:1;overflow-y:auto;padding:18px 20px;}
@@ -229,22 +229,23 @@ textarea::placeholder{color:#444;}
 .section-count{font-size:11px;color:var(--text-dim);font-family:'DM Mono',monospace;}
 table{width:100%;border-collapse:collapse;font-size:13px;margin-bottom:24px;}
 thead th{padding:7px 10px;text-align:left;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text-dim);border-bottom:1px solid var(--border);}
-tbody tr{border-bottom:1px solid #1e1e1e;}
+tbody tr{border-bottom:1px solid #e7e2dc;}
+tbody tr:hover{background:#fbfaf8;}
 tbody td{padding:9px 10px;vertical-align:middle;}
 .td-time{font-family:'DM Mono',monospace;font-size:13px;font-weight:500;}
 .td-time.am{color:var(--am);}.td-time.pm{color:var(--pm);}
 .td-name{font-weight:500;}
 .td-people{font-family:'DM Mono',monospace;font-size:12px;color:var(--text-dim);}
 .td-memo{font-size:12px;color:var(--text-dim);}
-.btn-del{background:none;border:none;color:#3a3a3a;cursor:pointer;font-size:14px;padding:4px 6px;border-radius:4px;}
+.btn-del{background:none;border:none;color:#aaa29a;cursor:pointer;font-size:14px;padding:4px 6px;border-radius:4px;}
 .btn-del:hover{color:var(--accent);}
-.empty-state{text-align:center;padding:48px 0;color:#444;font-size:13px;}
+.empty-state{text-align:center;padding:48px 0;color:#918981;font-size:13px;}
 .empty-state .emoji{font-size:32px;display:block;margin-bottom:12px;opacity:.4;}
 .summary-bar{display:flex;gap:16px;margin-bottom:12px;padding:8px 12px;background:var(--surface);border-radius:8px;border:1px solid var(--border);font-size:12px;}
 .summary-bar span{color:var(--text-dim);}
 .summary-bar strong{color:var(--text);font-family:'DM Mono',monospace;}
-.td-table-input{background:transparent;border:none;border-bottom:1px solid #333;color:var(--text-dim);font-family:'DM Mono',monospace;font-size:12px;width:60px;padding:2px 4px;outline:none;}
-.td-table-input:focus{border-bottom-color:#666;color:var(--text);}
+.td-table-input{background:transparent;border:none;border-bottom:1px solid #cfc8c0;color:var(--text-dim);font-family:'DM Mono',monospace;font-size:12px;width:60px;padding:2px 4px;outline:none;}
+.td-table-input:focus{border-bottom-color:#81776e;color:var(--text);}
 
 /* ── 배치도 패널 ── */
 .map-panel{flex:1;overflow-y:auto;padding:20px 24px;display:none;}
@@ -257,8 +258,8 @@ tbody td{padding:9px 10px;vertical-align:middle;}
 
 /* 층 섹션 */
 .floor-section{margin-bottom:24px;}
-.floor-label{font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#a78bfa;margin-bottom:12px;display:flex;align-items:center;gap:8px;}
-.floor-label::after{content:'';flex:1;height:1px;background:#2a2a3e;}
+.floor-label{font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#514a44;margin-bottom:12px;display:flex;align-items:center;gap:8px;}
+.floor-label::after{content:'';flex:1;height:1px;background:#d9d3cc;}
 
 /* 구역 레이아웃 */
 .floor-zones{display:flex;flex-direction:column;gap:12px;}
@@ -266,16 +267,16 @@ tbody td{padding:9px 10px;vertical-align:middle;}
 /* 구역 행 */
 .zone-row{display:flex;gap:12px;align-items:flex-start;}
 .zone-group{display:flex;flex-direction:column;gap:4px;}
-.zone-name{font-size:9px;font-weight:700;letter-spacing:1px;color:#555;text-transform:uppercase;text-align:center;margin-bottom:4px;}
+.zone-name{font-size:9px;font-weight:700;letter-spacing:1px;color:#847d76;text-transform:uppercase;text-align:center;margin-bottom:4px;}
 
 /* 룸 안 테이블 쌍 */
-.room-box{background:#181818;border:1px solid #2a2a2a;border-radius:8px;padding:6px;display:flex;flex-direction:column;gap:4px;}
-.room-box.window-room{background:#141e14;border-color:#1e2e1e;}
+.room-box{background:#f2efea;border:1px solid #ddd7cf;border-radius:8px;padding:6px;display:flex;flex-direction:column;gap:4px;}
+.room-box.window-room{background:#edf2ee;border-color:#d5dfd7;}
 .room-box.room-h{flex-direction:row;}
 
 /* 구분선 (룸 사이 간격) */
 .zone-gap{width:20px;flex-shrink:0;}
-.zone-divider{width:1px;background:#2a2a2a;align-self:stretch;margin:0 4px;}
+.zone-divider{width:1px;background:#ddd7cf;align-self:stretch;margin:0 4px;}
 
 /* 테이블 셀 */
 .tbl-cell{
@@ -289,41 +290,41 @@ tbody td{padding:9px 10px;vertical-align:middle;}
 @media(max-width:600px){.tbl-cell{width:50px;height:50px;padding:4px 3px;}}
 .tbl-cell:active{filter:brightness(1.2);}
 .tbl-cell.vacant{background:var(--surface2);border-color:var(--border);}
-.tbl-cell.booked-am{background:rgba(212,168,83,.15);border-color:var(--am);}
-.tbl-cell.booked-pm{background:rgba(91,143,212,.15);border-color:var(--pm);}
-.tbl-cell.booked-both{background:linear-gradient(135deg,rgba(212,168,83,.2) 50%,rgba(91,143,212,.2) 50%);border-color:#c084fc;}
+.tbl-cell.booked-am{background:rgba(120,84,69,.12);border-color:var(--am);}
+.tbl-cell.booked-pm{background:rgba(83,99,106,.12);border-color:var(--pm);}
+.tbl-cell.booked-both{background:linear-gradient(135deg,rgba(120,84,69,.13) 50%,rgba(83,99,106,.13) 50%);border-color:#6b625b;}
 .tbl-num{font-family:'DM Mono',monospace;font-size:11px;font-weight:700;color:var(--text-dim);line-height:1;margin-bottom:2px;}
 .tbl-cell.booked-am .tbl-num{color:var(--am);}
 .tbl-cell.booked-pm .tbl-num{color:var(--pm);}
-.tbl-cell.booked-both .tbl-num{color:#c084fc;}
+.tbl-cell.booked-both .tbl-num{color:#564f49;}
 .booking-chip{font-size:9px;line-height:1.3;text-align:center;width:100%;padding:1px 2px;border-radius:2px;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.chip-am{background:rgba(212,168,83,.2);color:var(--am);}
-.chip-pm{background:rgba(91,143,212,.2);color:var(--pm);}
+.chip-am{background:rgba(120,84,69,.13);color:var(--am);}
+.chip-pm{background:rgba(83,99,106,.13);color:var(--pm);}
 
 /* 모바일 탭 상세 (탭 클릭 시 나오는 팝업) */
 .mobile-popup{
   display:none;position:fixed;bottom:0;left:0;right:0;
-  background:#1e1e1e;border-top:1px solid #3a3a3a;border-radius:16px 16px 0 0;
+  background:#fff;border-top:1px solid var(--border);border-radius:16px 16px 0 0;
   padding:20px;z-index:500;max-height:60vh;overflow-y:auto;
 }
 .mobile-popup.show{display:block;}
-.popup-handle{width:36px;height:4px;background:#444;border-radius:2px;margin:0 auto 16px;}
-.popup-title{font-size:14px;font-weight:700;color:#a78bfa;margin-bottom:12px;font-family:'DM Mono',monospace;}
-.popup-row{display:flex;gap:10px;padding:6px 0;border-bottom:1px solid #2a2a2a;font-size:13px;align-items:center;}
+.popup-handle{width:36px;height:4px;background:#c7c0b8;border-radius:2px;margin:0 auto 16px;}
+.popup-title{font-size:14px;font-weight:700;color:#4e4842;margin-bottom:12px;font-family:'DM Mono',monospace;}
+.popup-row{display:flex;gap:10px;padding:6px 0;border-bottom:1px solid #ebe7e2;font-size:13px;align-items:center;}
 .popup-time-am{color:var(--am);font-weight:700;font-family:'DM Mono',monospace;min-width:48px;}
 .popup-time-pm{color:var(--pm);font-weight:700;font-family:'DM Mono',monospace;min-width:48px;}
 .popup-name{font-weight:500;}
 .popup-people{color:var(--text-dim);font-size:12px;margin-left:auto;}
-.popup-memo{color:#666;font-size:11px;}
+.popup-memo{color:#7f7770;font-size:11px;}
 .popup-close{width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text-dim);border-radius:8px;padding:10px;margin-top:14px;font-size:13px;cursor:pointer;touch-action:manipulation;}
 /* 캘린더 팝업 */
 .cal-overlay{display:none;position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.5);}
 .cal-overlay.show{display:block;}
 .cal-popup{
   position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
-  background:#1a1a1a;border:1px solid #3a3a3a;border-radius:14px;
+  background:#fff;border:1px solid var(--border);border-radius:14px;
   padding:18px;z-index:201;width:310px;
-  box-shadow:0 16px 48px rgba(0,0,0,.7);
+  box-shadow:0 18px 48px rgba(55,45,38,.18);
 }
 .cal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
 .cal-title{font-size:14px;font-weight:700;color:var(--text);}
@@ -338,7 +339,7 @@ tbody td{padding:9px 10px;vertical-align:middle;}
 }
 .cal-day:hover{background:var(--surface2);color:var(--text);}
 .cal-day.today{color:var(--am);font-weight:700;}
-.cal-day.selected{background:var(--am);color:#000;font-weight:700;}
+.cal-day.selected{background:var(--am);color:#fff;font-weight:700;}
 .cal-day.has-reservation{position:relative;}
 .cal-day.has-reservation::after{content:'';position:absolute;bottom:2px;left:50%;transform:translateX(-50%);width:4px;height:4px;border-radius:50%;background:var(--green);}
 .cal-day.empty{cursor:default;pointer-events:none;}
@@ -355,10 +356,10 @@ tbody td{padding:9px 10px;vertical-align:middle;}
   <div class="logo"><img src="./logo.jpg" alt="상무옥"></div>
   <div class="date-nav">
     <button onclick="changeDate(-1)">‹</button>
-    <span id="current-date-label" onclick="openCalendar()" style="cursor:pointer;border-bottom:1px dashed #555;padding-bottom:1px"></span>
+    <span id="current-date-label" onclick="openCalendar()" style="cursor:pointer;border-bottom:1px dashed #aaa29a;padding-bottom:1px"></span>
     <button onclick="changeDate(1)">›</button>
   </div>
-  <button onclick="exportExcel()" style="background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:0 12px;height:30px;cursor:pointer;font-size:12px;margin-left:8px">🖨 프린트</button>
+  <button onclick="exportExcel()" style="background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:0 12px;height:30px;cursor:pointer;font-size:12px;margin-left:8px">프린트</button>
 </header>
 
 <!-- 캘린더 오버레이 -->
@@ -374,10 +375,10 @@ tbody td{padding:9px 10px;vertical-align:middle;}
 </div>
 
 <div class="tabs">
-  <div class="tab am active" onclick="switchTab('am')">🌅 오전 <span class="tab-badge" id="badge-am">0</span></div>
-  <div class="tab pm" onclick="switchTab('pm')">🌇 오후 <span class="tab-badge" id="badge-pm">0</span></div>
-  <div class="tab map" onclick="switchTab('map')">🗺 배치도</div>
-  <div class="tab chat" onclick="switchTab('chat')">💬 예약톡</div>
+  <div class="tab am active" onclick="switchTab('am')">오전 <span class="tab-badge" id="badge-am">0</span></div>
+  <div class="tab pm" onclick="switchTab('pm')">오후 <span class="tab-badge" id="badge-pm">0</span></div>
+  <div class="tab map" onclick="switchTab('map')">배치도</div>
+  <div class="tab chat" onclick="switchTab('chat')">예약톡</div>
 </div>
 
 <div class="main">
@@ -407,7 +408,7 @@ tbody td{padding:9px 10px;vertical-align:middle;}
   <!-- 예약톡 -->
   <div class="chat-panel" id="chat-panel">
     <div class="chat-sender-select">
-      <input id="chat-search" placeholder="🔍 채팅 검색" oninput="searchChat()" style="flex:1;min-width:120px;background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:6px 10px;font-size:13px;outline:none;font-family:'Noto Sans KR',sans-serif">
+      <input id="chat-search" placeholder="채팅 검색" oninput="searchChat()" style="flex:1;min-width:120px;background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:6px 10px;font-size:13px;outline:none;font-family:'Noto Sans KR',sans-serif">
       <span id="search-count" style="font-size:11px;color:var(--text-dim)"></span>
       <span style="font-size:11px;color:var(--text-dim)">|</span>
       <button id="my-profile" class="profile-name-btn" type="button" onclick="openProfileName(false)" title="사용자 이름 수정"></button>
@@ -441,7 +442,7 @@ tbody td{padding:9px 10px;vertical-align:middle;}
   <div style="font-size:13px;color:var(--text-dim);margin-bottom:28px">예약관리 로그인</div>
   <input id="login-id" placeholder="이메일 또는 아이디" autocomplete="username" style="width:100%;max-width:280px;background:var(--surface);border:1px solid var(--border);border-radius:10px;color:var(--text);padding:13px 14px;font-size:15px;margin-bottom:10px;outline:none">
   <input id="login-pw" type="password" placeholder="비밀번호" autocomplete="current-password" style="width:100%;max-width:280px;background:var(--surface);border:1px solid var(--border);border-radius:10px;color:var(--text);padding:13px 14px;font-size:15px;margin-bottom:16px;outline:none">
-  <button onclick="doLogin()" style="width:100%;max-width:280px;background:var(--green);color:#000;border:none;border-radius:10px;padding:14px;font-size:15px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif">로그인</button>
+  <button onclick="doLogin()" style="width:100%;max-width:280px;background:var(--green);color:#fff;border:none;border-radius:10px;padding:14px;font-size:15px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif">로그인</button>
   <div id="login-error" style="color:var(--accent);font-size:13px;margin-top:12px;min-height:18px"></div>
 </div>
 
@@ -454,7 +455,7 @@ tbody td{padding:9px 10px;vertical-align:middle;}
     <div id="profile-name-error" style="color:var(--accent);font-size:12px;margin:8px 0;min-height:18px"></div>
     <div style="display:flex;gap:8px">
       <button id="profile-name-cancel" type="button" onclick="closeProfileName()" style="flex:1;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:9px;padding:11px;cursor:pointer">취소</button>
-      <button id="profile-name-save" type="button" onclick="saveProfileName()" style="flex:2;background:var(--green);color:#000;border:none;border-radius:9px;padding:11px;font-weight:700;cursor:pointer">저장</button>
+      <button id="profile-name-save" type="button" onclick="saveProfileName()" style="flex:2;background:var(--green);color:#fff;border:none;border-radius:9px;padding:11px;font-weight:700;cursor:pointer">저장</button>
     </div>
   </div>
 </div>
@@ -484,18 +485,18 @@ function todayKey(){const d=new Date();return`${d.getFullYear()}-${pad(d.getMont
 function pad(n){return String(n).padStart(2,'0');}
 
 // ── Supabase 연동 ─────────────────────────────────────
-function showSyncStatus(msg, color='#888'){
+function showSyncStatus(msg, color='#716b64'){
   let el=document.getElementById('sync-status');
   if(!el){
     el=document.createElement('div');
     el.id='sync-status';
-    el.style.cssText='position:fixed;bottom:16px;right:16px;background:#1a1a1a;border:1px solid #333;border-radius:8px;padding:8px 14px;font-size:12px;z-index:999;transition:opacity .3s;';
+    el.style.cssText='position:fixed;bottom:16px;right:16px;background:#fff;border:1px solid #dcd6ce;border-radius:8px;padding:8px 14px;font-size:12px;z-index:999;transition:opacity .3s;box-shadow:0 8px 24px rgba(55,45,38,.1);';
     document.body.appendChild(el);
   }
   el.style.color=color;
   el.textContent=msg;
   el.style.opacity='1';
-  if(color==='#52c87a') setTimeout(()=>{el.style.opacity='0';},2000);
+  if(color==='#405b4d') setTimeout(()=>{el.style.opacity='0';},2000);
 }
 
 async function loadFromSheet(){
@@ -503,10 +504,10 @@ async function loadFromSheet(){
   try{
     reservations = await SangmuokDB.loadReservations();
     try{localStorage.setItem('sangmuok_v2',JSON.stringify(reservations));}catch{}
-    showSyncStatus('✓ 동기화 완료', '#52c87a');
+    showSyncStatus('✓ 동기화 완료', '#405b4d');
   } catch(e) {
     try{const c=localStorage.getItem('sangmuok_v2');if(c)reservations=JSON.parse(c);}catch{}
-    showSyncStatus('오프라인 모드', '#d4a853');
+    showSyncStatus('오프라인 모드', '#785445');
   }
   render();
   typeof renderCalendar === 'function' && renderCalendar();
@@ -523,10 +524,10 @@ async function saveToSheet(){
   try{localStorage.setItem('sangmuok_v2',JSON.stringify(reservations));}catch{}
   try{
     await SangmuokDB.syncReservations(reservations);
-    showSyncStatus('✓ 저장 완료','#52c87a');
+    showSyncStatus('✓ 저장 완료','#405b4d');
   }catch(e){
     console.error(e);
-    showSyncStatus('저장 실패 · 로컬 보관','#e85d4a');
+    showSyncStatus('저장 실패 · 로컬 보관','#a5473d');
   }
   isSyncing=false;
   if(syncRequested){
@@ -883,7 +884,7 @@ function showTableDetail(tNum){
       <span class="${cls}">${escapeHtml(r.time)}</span>
       <span class="popup-name">${escapeHtml(r.name)}</span>
       <span class="popup-people">${r.people?escapeHtml(r.people)+'명':''}</span>
-      <button onclick='startMove("${r.dateKey||currentDateKey}","${slot}","${r.id}",${tNum})' style="margin-left:8px;background:var(--am);color:#000;border:none;border-radius:6px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer">이동</button>
+      <button onclick='startMove("${r.dateKey||currentDateKey}","${slot}","${r.id}",${tNum})' style="margin-left:8px;background:var(--am);color:#fff;border:none;border-radius:6px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer">이동</button>
     </div>${r.memo?`<div class="popup-memo" style="padding:2px 0 6px 58px;">${escapeHtml(r.memo)}</div>`:''}`;
   }
   b.am.forEach(r=>{html+=rowHtml(r,'am');});
@@ -946,9 +947,9 @@ function renderMap(){
 
   const legend=`<div class="legend">
     <div class="legend-item"><div class="legend-dot" style="background:var(--surface2);border:1px solid var(--border)"></div>빈 테이블</div>
-    <div class="legend-item"><div class="legend-dot" style="background:rgba(212,168,83,.4);border:1px solid var(--am)"></div>오전</div>
-    <div class="legend-item"><div class="legend-dot" style="background:rgba(91,143,212,.4);border:1px solid var(--pm)"></div>오후</div>
-    <div class="legend-item"><div class="legend-dot" style="background:linear-gradient(135deg,rgba(212,168,83,.4) 50%,rgba(91,143,212,.4) 50%);border:1px solid #c084fc"></div>오전+오후</div>
+    <div class="legend-item"><div class="legend-dot" style="background:rgba(120,84,69,.2);border:1px solid var(--am)"></div>오전</div>
+    <div class="legend-item"><div class="legend-dot" style="background:rgba(83,99,106,.2);border:1px solid var(--pm)"></div>오후</div>
+    <div class="legend-item"><div class="legend-dot" style="background:linear-gradient(135deg,rgba(120,84,69,.2) 50%,rgba(83,99,106,.2) 50%);border:1px solid #6b625b"></div>오전+오후</div>
   </div>`;
 
   // ── 셀 헬퍼 ──────────────────────────────────────
@@ -1061,9 +1062,9 @@ function renderMap(){
   </div>`;
 
   const moveBar = moveMode
-    ? `<div style="background:var(--am);color:#000;padding:10px 14px;border-radius:8px;margin-bottom:12px;font-size:13px;font-weight:700;display:flex;justify-content:space-between;align-items:center">
+    ? `<div style="background:var(--am);color:#fff;padding:10px 14px;border-radius:8px;margin-bottom:12px;font-size:13px;font-weight:700;display:flex;justify-content:space-between;align-items:center">
         <span>📍 ${moveMode.fromTable}번 → 이동할 테이블 선택</span>
-        <button onclick="cancelMove()" style="background:#000;color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer">취소</button>
+        <button onclick="cancelMove()" style="background:#fff;color:var(--am);border:none;border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer">취소</button>
       </div>`
     : '';
   panel.innerHTML=moveBar+legend+f1+f2;
@@ -1565,7 +1566,7 @@ function renderChat(){
   const box=document.getElementById('chat-messages');
   if(!box) return;
   if(!chatMessages.length){
-    box.innerHTML='<div style="text-align:center;color:#444;font-size:13px;padding:40px 0">아직 메시지가 없어요.<br>예약을 입력해보세요.</div>';
+    box.innerHTML='<div style="text-align:center;color:#918981;font-size:13px;padding:40px 0">아직 메시지가 없어요.<br>예약을 입력해보세요.</div>';
     return;
   }
   const days=['일','월','화','수','목','금','토'];
@@ -1615,7 +1616,7 @@ function renderChat(){
     let textHtml=escapeHtml(m.text);
     if(searchTerm){
       const re=new RegExp('('+searchTerm.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','gi');
-      textHtml=textHtml.replace(re,'<mark style="background:var(--am);color:#000">$1</mark>');
+      textHtml=textHtml.replace(re,'<mark style="background:var(--am-dim);color:var(--am)">$1</mark>');
     }
     // 답장 인용 (이 메시지가 다른 메시지에 답장한 경우)
     let quoteHtml='';
@@ -1634,7 +1635,7 @@ function renderChat(){
     </div>`;
   });
   if(searchTerm && !html){
-    html='<div style="text-align:center;color:#444;font-size:13px;padding:40px 0">검색 결과가 없어요</div>';
+    html='<div style="text-align:center;color:#918981;font-size:13px;padding:40px 0">검색 결과가 없어요</div>';
   }
   box.innerHTML=html;
   attachSwipeReply();
@@ -2007,7 +2008,7 @@ function showBanner(text){
   if(!b){
     b=document.createElement('div');
     b.id='notify-banner';
-    b.style.cssText='position:fixed;top:12px;left:50%;transform:translateX(-50%);background:var(--green);color:#000;padding:12px 20px;border-radius:12px;font-size:14px;font-weight:700;z-index:9999;box-shadow:0 6px 24px rgba(0,0,0,.5);max-width:90%;text-align:center;transition:opacity .3s,top .3s;cursor:pointer;';
+    b.style.cssText='position:fixed;top:12px;left:50%;transform:translateX(-50%);background:var(--green);color:#fff;padding:12px 20px;border-radius:12px;font-size:14px;font-weight:700;z-index:9999;box-shadow:0 8px 24px rgba(51,67,57,.22);max-width:90%;text-align:center;transition:opacity .3s,top .3s;cursor:pointer;';
     b.onclick=()=>{b.style.opacity='0';};
     document.body.appendChild(b);
   }
