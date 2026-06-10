@@ -44,6 +44,17 @@ header{padding:12px 20px;border-bottom:1px solid var(--border);display:flex;alig
 /* ── 채팅 패널 ── */
 .chat-panel{flex:1;display:none;flex-direction:column;height:100%;position:relative;}
 .chat-panel.active{display:flex;}
+.chat-map-drawer{position:absolute;top:0;right:0;bottom:0;width:50%;background:var(--bg);border-left:1px solid var(--border);box-shadow:-12px 0 30px rgba(55,45,38,.12);z-index:35;transform:translateX(102%);transition:transform .25s ease;display:flex;flex-direction:column;}
+.chat-map-drawer.show{transform:translateX(0);}
+.chat-map-head{height:48px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:0 14px;border-bottom:1px solid var(--border);background:#fff;}
+.chat-map-title{font-size:14px;font-weight:700;}
+.chat-map-close{width:32px;height:32px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);font-size:20px;cursor:pointer;}
+.chat-map-content{flex:1;overflow:auto;padding:16px;}
+.chat-map-open{border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);font-size:11px;font-weight:700;padding:5px 9px;cursor:pointer;}
+@media(max-width:700px){
+  .chat-map-drawer{width:66.666%;}
+  .chat-map-content{padding:12px;}
+}
 .chat-messages{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px;overscroll-behavior:contain;min-height:0;}
 .chat-date-divider{text-align:center;font-size:11px;color:var(--text-dim);margin:8px 0;}
 .chat-date-divider span{background:var(--surface2);padding:3px 12px;border-radius:10px;}
@@ -424,6 +435,7 @@ tbody td{padding:9px 10px;vertical-align:middle;}
       <input id="chat-search" placeholder="채팅 검색" oninput="searchChat()" style="flex:1;min-width:120px;background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:6px 10px;font-size:13px;outline:none;font-family:'Noto Sans KR',sans-serif">
       <span id="search-count" style="font-size:11px;color:var(--text-dim)"></span>
       <span style="font-size:11px;color:var(--text-dim)">|</span>
+      <button class="chat-map-open" type="button" onclick="openChatMap()">배치도</button>
       <button id="my-profile" class="profile-name-btn" type="button" onclick="openProfileName(false)" title="사용자 이름 수정"></button>
       <button onclick="logout()" style="background:none;border:none;color:var(--text-dim);font-size:11px;cursor:pointer;text-decoration:underline">로그아웃</button>
       <label class="chat-auto-toggle"><input type="checkbox" id="auto-register" checked> 자동등록</label>
@@ -446,6 +458,13 @@ tbody td{padding:9px 10px;vertical-align:middle;}
         </svg>
       </button>
     </div>
+    <aside id="chat-map-drawer" class="chat-map-drawer" aria-label="예약톡 배치도">
+      <div class="chat-map-head">
+        <div class="chat-map-title">실시간 배치도</div>
+        <button class="chat-map-close" type="button" onclick="closeChatMap()" aria-label="배치도 닫기">×</button>
+      </div>
+      <div id="chat-map-content" class="chat-map-content"></div>
+    </aside>
   </div>
 </div>
 
@@ -593,11 +612,21 @@ function switchTab(tab){
   document.getElementById('table-panel').style.display=(isMap||isChat)?'none':'';
   document.getElementById('map-panel').classList.toggle('active',isMap);
   document.getElementById('chat-panel').classList.toggle('active',isChat);
+  if(!isChat) closeChatMap();
   // 예약 탭에서만 + 플로팅 버튼 표시
   document.getElementById('fab-add').classList.toggle('show',isReservation);
   if(!isReservation) closeInputSheet();
   if(isChat){ renderChat(); scrollChatBottom(); }
   else render();
+}
+
+function openChatMap(){
+  renderMap();
+  document.getElementById('chat-map-drawer').classList.add('show');
+}
+
+function closeChatMap(){
+  document.getElementById('chat-map-drawer')?.classList.remove('show');
 }
 
 // 예약 입력 바텀시트 열기/닫기
@@ -986,7 +1015,10 @@ async function applyMove(toTable){
 
 // ── 배치도 렌더 ──────────────────────────────────────
 function renderMap(){
-  const panel=document.getElementById('map-panel');
+  const panels=[
+    document.getElementById('map-panel'),
+    document.getElementById('chat-map-content')
+  ].filter(Boolean);
 
   const legend=`<div class="legend">
     <div class="legend-item"><div class="legend-dot" style="background:var(--surface2);border:1px solid var(--border)"></div>빈 테이블</div>
@@ -1110,7 +1142,8 @@ function renderMap(){
         <button onclick="cancelMove()" style="background:#fff;color:var(--am);border:none;border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer">취소</button>
       </div>`
     : '';
-  panel.innerHTML=moveBar+legend+f1+f2;
+  const html=moveBar+legend+f1+f2;
+  panels.forEach(panel=>{panel.innerHTML=html;});
 }
 
 // ── 리스트 렌더 ───────────────────────────────────────
@@ -2030,7 +2063,7 @@ setInterval(autoSync, 5000);
 
 // ── PWA 서비스워커 등록 ───────────────────────────────
 if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('./service-worker.js?v=12').catch(()=>{});
+  navigator.serviceWorker.register('./service-worker.js?v=13').catch(()=>{});
 }
 
 // ── 알림 기능 ─────────────────────────────────────────
