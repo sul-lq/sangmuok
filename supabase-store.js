@@ -147,6 +147,23 @@
     if (error) throw error;
   }
 
+  async function updateDisplayName(displayName) {
+    if (!currentProfile) throw new Error("로그인이 필요합니다.");
+    const name = String(displayName || "").trim();
+    if (name.length < 2 || name.length > 20) {
+      throw new Error("이름은 2~20자로 입력하세요.");
+    }
+    const { data, error } = await client
+      .from("profiles")
+      .update({ display_name: name })
+      .eq("id", currentProfile.id)
+      .select("id, display_name, role")
+      .single();
+    if (error) throw error;
+    currentProfile = data;
+    return data;
+  }
+
   async function loadReservations() {
     const { data, error } = await client
       .from("reservations")
@@ -231,6 +248,7 @@
     return {
       id: Number(row.id),
       time: row.created_at,
+      senderId: row.sender_id || null,
       sender: row.sender_name || "직원",
       text: row.message,
       ...(row.reply_to_id ? { replyTo: Number(row.reply_to_id) } : {})
@@ -309,6 +327,7 @@
     getCurrentUser,
     signIn,
     signOut,
+    updateDisplayName,
     loadReservations,
     syncReservations,
     loadMessages,

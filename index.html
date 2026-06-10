@@ -181,6 +181,7 @@ header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;alig
 }
 .chat-sender-select{display:flex;gap:6px;padding:8px 12px;border-bottom:1px solid var(--border);align-items:center;flex-wrap:wrap;}
 .chat-sender-select span{font-size:11px;color:var(--text-dim);}
+.profile-name-btn{background:none;border:none;color:var(--green);font-size:12px;font-weight:700;cursor:pointer;padding:3px 2px;font-family:'Noto Sans KR',sans-serif;}
 .chat-sender-btn{background:var(--surface);border:1px solid var(--border);color:var(--text-dim);border-radius:14px;padding:4px 12px;font-size:12px;cursor:pointer;font-family:'Noto Sans KR',sans-serif;}
 .chat-sender-btn.active{background:var(--green);color:#000;border-color:var(--green);font-weight:700;}
 .chat-auto-toggle{margin-left:auto;display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-dim);cursor:pointer;}
@@ -409,7 +410,7 @@ tbody td{padding:9px 10px;vertical-align:middle;}
       <input id="chat-search" placeholder="🔍 채팅 검색" oninput="searchChat()" style="flex:1;min-width:120px;background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:6px 10px;font-size:13px;outline:none;font-family:'Noto Sans KR',sans-serif">
       <span id="search-count" style="font-size:11px;color:var(--text-dim)"></span>
       <span style="font-size:11px;color:var(--text-dim)">|</span>
-      <span id="my-profile" style="font-size:12px;color:var(--green);font-weight:700"></span>
+      <button id="my-profile" class="profile-name-btn" type="button" onclick="openProfileName(false)" title="사용자 이름 수정"></button>
       <button onclick="logout()" style="background:none;border:none;color:var(--text-dim);font-size:11px;cursor:pointer;text-decoration:underline">로그아웃</button>
       <label class="chat-auto-toggle"><input type="checkbox" id="auto-register" checked> 자동등록</label>
     </div>
@@ -442,6 +443,20 @@ tbody td{padding:9px 10px;vertical-align:middle;}
   <input id="login-pw" type="password" placeholder="비밀번호" autocomplete="current-password" style="width:100%;max-width:280px;background:var(--surface);border:1px solid var(--border);border-radius:10px;color:var(--text);padding:13px 14px;font-size:15px;margin-bottom:16px;outline:none">
   <button onclick="doLogin()" style="width:100%;max-width:280px;background:var(--green);color:#000;border:none;border-radius:10px;padding:14px;font-size:15px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif">로그인</button>
   <div id="login-error" style="color:var(--accent);font-size:13px;margin-top:12px;min-height:18px"></div>
+</div>
+
+<!-- 예약톡 사용자 이름 설정 -->
+<div id="profile-name-screen" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.76);z-index:2100;align-items:center;justify-content:center;padding:24px;">
+  <div style="width:100%;max-width:320px;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:22px;">
+    <div style="font-size:18px;font-weight:700;margin-bottom:6px">예약톡 이름 설정</div>
+    <div style="font-size:12px;color:var(--text-dim);margin-bottom:16px">채팅에 표시할 사용자 이름을 입력하세요.</div>
+    <input id="profile-name-input" maxlength="20" autocomplete="name" placeholder="예: 김상무" style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--border);border-radius:10px;color:var(--text);padding:12px 13px;font-size:15px;outline:none;font-family:'Noto Sans KR',sans-serif">
+    <div id="profile-name-error" style="color:var(--accent);font-size:12px;margin:8px 0;min-height:18px"></div>
+    <div style="display:flex;gap:8px">
+      <button id="profile-name-cancel" type="button" onclick="closeProfileName()" style="flex:1;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:9px;padding:11px;cursor:pointer">취소</button>
+      <button id="profile-name-save" type="button" onclick="saveProfileName()" style="flex:2;background:var(--green);color:#000;border:none;border-radius:9px;padding:11px;font-weight:700;cursor:pointer">저장</button>
+    </div>
+  </div>
 </div>
 
 <!-- 모바일 팝업 -->
@@ -1107,6 +1122,66 @@ let lastReadId = (()=>{try{const v=localStorage.getItem('sangmuok_lastread');ret
 // ── 로그인 ────────────────────────────────────────────
 let currentUser = null;
 let currentSender = '';
+let profileNameRequired = false;
+
+function isMyMessage(message){
+  return Boolean(
+    message &&
+    ((message.senderId && currentUser?.uid && message.senderId===currentUser.uid) ||
+      (!message.senderId && message.sender===currentSender))
+  );
+}
+
+function needsProfileName(user){
+  return !user.name || user.name.trim()===user.id;
+}
+
+function openProfileName(required=false){
+  if(!currentUser) return;
+  profileNameRequired=required;
+  const screen=document.getElementById('profile-name-screen');
+  const input=document.getElementById('profile-name-input');
+  document.getElementById('profile-name-error').textContent='';
+  document.getElementById('profile-name-cancel').style.display=required?'none':'block';
+  input.value=needsProfileName(currentUser)?'':currentSender;
+  screen.style.display='flex';
+  setTimeout(()=>input.focus(),0);
+}
+
+function closeProfileName(){
+  if(profileNameRequired) return;
+  document.getElementById('profile-name-screen').style.display='none';
+}
+
+async function saveProfileName(){
+  const input=document.getElementById('profile-name-input');
+  const error=document.getElementById('profile-name-error');
+  const button=document.getElementById('profile-name-save');
+  const name=input.value.trim();
+  if(name.length<2 || name.length>20){
+    error.textContent='이름은 2~20자로 입력하세요';
+    return;
+  }
+  error.textContent='';
+  button.disabled=true;
+  button.textContent='저장 중...';
+  try{
+    const profile=await SangmuokDB.updateDisplayName(name);
+    currentUser.name=profile.display_name;
+    currentSender=profile.display_name;
+    document.getElementById('my-profile').textContent=currentSender;
+    try{localStorage.setItem('sangmuok_user',JSON.stringify(currentUser));}catch{}
+    profileNameRequired=false;
+    document.getElementById('profile-name-screen').style.display='none';
+    renderChat();
+  }catch(e){
+    console.error(e);
+    error.textContent=e.message||'이름 저장에 실패했어요';
+  }finally{
+    button.disabled=false;
+    button.textContent='저장';
+  }
+}
 
 async function doLogin(){
   const id=document.getElementById('login-id').value.trim();
@@ -1140,6 +1215,7 @@ async function activateUser(user){
   await Promise.all([loadFromSheet(),loadChats()]);
   SangmuokDB.subscribe(()=>autoSync());
   renderChat();
+  if(needsProfileName(user)) openProfileName(true);
 }
 
 function showLoginScreen(){
@@ -1155,6 +1231,8 @@ document.addEventListener('DOMContentLoaded',()=>{});
 (function(){
   const pw=document.getElementById('login-pw');
   if(pw) pw.addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
+  const name=document.getElementById('profile-name-input');
+  if(name) name.addEventListener('keydown',e=>{if(e.key==='Enter')saveProfileName();});
 })();
 
 // ── 채팅 검색 ─────────────────────────────────────────
@@ -1404,7 +1482,7 @@ function attachSwipeReply(){
 function askDeleteChat(msgId){
   const m=chatMessages.find(x=>String(x.id)===String(msgId));
   if(!m) return;
-  if(m.sender!==currentSender){ showBanner('본인 메시지만 삭제할 수 있어요'); return; }
+  if(!isMyMessage(m)){ showBanner('본인 메시지만 삭제할 수 있어요'); return; }
   if(confirm(`이 메시지를 삭제할까요?\n\n"${m.text.slice(0,40)}"`)){
     deleteChat(m.id);
   }
@@ -1446,7 +1524,7 @@ async function sendChat(){
   }
 
   const now=new Date();
-  const msg={id:Date.now(),time:now.toISOString(),sender:currentSender,text};
+  const msg={id:Date.now(),time:now.toISOString(),senderId:currentUser?.uid||null,sender:currentSender,text};
   if(replyTarget) msg.replyTo=replyTarget.id;
   input.value='';
   input.style.height='48px';
@@ -1499,7 +1577,7 @@ function renderChat(){
       if(chatMessages[i].id===lastReadId){
         // 그 다음 메시지가 안 읽은 첫 메시지
         for(let j=i+1;j<chatMessages.length;j++){
-          if(chatMessages[j].sender!==currentSender){ firstUnreadIdx=j; break; }
+          if(!isMyMessage(chatMessages[j])){ firstUnreadIdx=j; break; }
         }
         break;
       }
@@ -1520,7 +1598,7 @@ function renderChat(){
       html+=`<div class="chat-read-divider">여기까지 읽었습니다</div>`;
     }
     const timeStr=`${pad(d.getHours())}:${pad(d.getMinutes())}`;
-    const mine=(m.sender===currentSender);
+    const mine=isMyMessage(m);
     const result=parseReservationText(m.text);
     let parsedHtml='';
     if(!result.error){
@@ -1966,7 +2044,7 @@ autoSync = async function(){
   // 채팅 증가 감지
   if(chatMessages.length>prevChatCount && prevChatCount>0){
     const last=chatMessages[chatMessages.length-1];
-    if(last.sender!==currentSender){
+    if(!isMyMessage(last)){
       showNotification(last.sender, last.text.slice(0,30));
     }
   }
