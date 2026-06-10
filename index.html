@@ -581,6 +581,21 @@ function closeInputSheet(){
 
 // ── 파싱 ─────────────────────────────────────────────
 const DAY_MAP={'월':1,'화':2,'수':3,'목':4,'금':5,'토':6,'일':0};
+function normalizeReservationTypos(raw){
+  return String(raw)
+    // 날짜 단어 오타와 붙여쓰기: 오늫6시, 내알 오후6시 등
+    .replace(/(오늘|오늫|오눌|오느|오널|오놀|오날|오늣|오늩|오늘르|오늘을)(?=\s|$|\d|오전|오후)/g,'오늘 ')
+    .replace(/(내일|내알|내얼|내읾|낼)(?=\s|$|\d|오전|오후)/g,'내일 ')
+    .replace(/(모레|모래|모례|모랴)(?=\s|$|\d|오전|오후)/g,'모레 ')
+    // 요일과 예약 단위의 흔한 키보드 오타
+    .replace(/([월화수목금토일])용일/g,'$1요일')
+    .replace(/(\d{1,2})\s*씨/g,'$1시')
+    .replace(/(\d+)\s*멍/g,'$1명')
+    .replace(/(\d{1,2})\s*[푼뷴]/g,'$1분')
+    .replace(/[ \t]+/g,' ')
+    .trim();
+}
+
 function parseTimeStr(str){
   let pm=false,am=false;
   if(str.includes('오후')){pm=true;str=str.replace('오후','').trim();}
@@ -632,23 +647,7 @@ function parseTimeStr(str){
 // 텍스트 → 예약 객체 파싱 (성공시 객체, 실패시 {error})
 function parseReservationText(raw){
   if(!raw||!raw.trim()) return {error:'빈 입력'};
-  // 흔한 오타 교정
-  let normalized = raw
-    // 오늘 변형: 오늫,오느,오눌,오늣,오늘르
-    .replace(/오[느늘늗늘늣늩늫눌누][르을]?/g, '오늘')
-    // 내일 변형: 내알,내얼,내읾,낼
-    .replace(/내[일알얼읾]/g, '내일')
-    .replace(/(^|\s)낼(\s|$)/g, '$1내일$2')
-    // 모레 변형: 모래,모레,모레
-    .replace(/모[레래]/g, '모레')
-    // 요일 오타: 목용일,금용일 (요→용)
-    .replace(/([월화수목금토일])용일/g, '$1요일')
-    // 시 오타: 6시,6씨,6시 (씨→시)
-    .replace(/(\d{1,2})\s*씨/g, '$1시')
-    // 명 오타: 6명,6멍 (멍→명)
-    .replace(/(\d+)\s*멍/g, '$1명')
-    // 분 오타: 30푼,30뷴 (푼/뷴→분)
-    .replace(/(\d{1,2})\s*[푼뷴]/g, '$1분');
+  let normalized = normalizeReservationTypos(raw);
   // 붙어있는 토큰 분리
   normalized = normalized
     .replace(/(\d{1,2})월\s+(\d{1,2})일/g, '$1/$2')
@@ -1961,7 +1960,7 @@ setInterval(autoSync, 5000);
 
 // ── PWA 서비스워커 등록 ───────────────────────────────
 if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('./service-worker.js?v=5').catch(()=>{});
+  navigator.serviceWorker.register('./service-worker.js?v=7').catch(()=>{});
 }
 
 // ── 알림 기능 ─────────────────────────────────────────
