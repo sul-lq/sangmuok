@@ -1864,7 +1864,7 @@ function exportExcel(dateKey=currentDateKey,selectedPages=['am-1','am-2','pm-1',
       <table>
         <colgroup><col class="c-table"><col class="c-time"><col class="c-name"><col class="c-people"><col class="c-memo"></colgroup>
         <thead><tr><th>테이블</th><th>시간</th><th>성함</th><th>인원수</th><th>특이사항</th></tr></thead>
-        <tbody>${buildRows(page.list,26)}</tbody>
+        <tbody>${buildRows(page.list,18)}</tbody>
       </table>
     </div>`).join('');
 
@@ -1879,9 +1879,9 @@ function exportExcel(dateKey=currentDateKey,selectedPages=['am-1','am-2','pm-1',
     .head .title{font-size:20px;font-weight:bold;}
     .head .sub{font-size:13px;}
     table{width:100%;border-collapse:collapse;table-layout:fixed;}
-    th,td{border:1px solid #000;padding:0;height:30px;font-size:13px;padding:2px 6px;vertical-align:middle;}
-    th{background:#e8e8e8;text-align:center;font-weight:bold;height:26px;}
-    col.c-table{width:20%;} col.c-time{width:15%;} col.c-name{width:25%;} col.c-people{width:13%;} col.c-memo{width:27%;}
+    th,td{border:1px solid #000;height:40px;font-size:14px;padding:4px 8px;vertical-align:middle;}
+    th{background:#e8e8e8;text-align:center;font-weight:bold;height:30px;}
+    col.c-table{width:18%;} col.c-time{width:15%;} col.c-name{width:25%;} col.c-people{width:12%;} col.c-memo{width:30%;}
     td{overflow:hidden;white-space:nowrap;}
     .toolbar{padding:10px;text-align:center;}
     @media print{.toolbar{display:none;}}
@@ -2019,7 +2019,7 @@ setInterval(autoSync, 5000);
 
 // ── PWA 서비스워커 등록 ───────────────────────────────
 if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('./service-worker.js?v=9').catch(()=>{});
+  navigator.serviceWorker.register('./service-worker.js?v=10').catch(()=>{});
 }
 
 // ── 알림 기능 ─────────────────────────────────────────
