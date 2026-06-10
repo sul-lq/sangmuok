@@ -23,8 +23,7 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
 
 /* 헤더 */
 header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;position:sticky;top:0;background:var(--bg);z-index:100;}
-.logo{font-size:17px;font-weight:700;}
-.logo span{color:var(--am);}
+.logo img{height:36px;filter:invert(1);mix-blend-mode:screen;}
 .date-nav{display:flex;align-items:center;gap:6px;margin-left:auto;}
 .date-nav button{background:var(--surface);border:1px solid var(--border);color:var(--text);width:30px;height:30px;border-radius:6px;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;touch-action:manipulation;}
 .date-nav button:active{background:var(--surface2);}
@@ -352,7 +351,7 @@ tbody td{padding:9px 10px;vertical-align:middle;}
 <body>
 
 <header>
-  <div class="logo">상무<span>옥</span></div>
+  <div class="logo"><img src="./logo.jpg" alt="상무옥"></div>
   <div class="date-nav">
     <button onclick="changeDate(-1)">‹</button>
     <span id="current-date-label" onclick="openCalendar()" style="cursor:pointer;border-bottom:1px dashed #555;padding-bottom:1px"></span>
