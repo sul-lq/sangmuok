@@ -696,19 +696,19 @@ function parseReservationText(raw){
   lines.forEach(l=>{
     l.split(/\s+/).filter(Boolean).forEach(tok=>workLines.push(tok));
   });
-  let dateKey=currentDateKey,timeStr=null,name=null,people=null,memo=[];
+  let dateKey=currentDateKey,timeStr=null,name=null,people=null,memo=[],dateExplicit=false,statedDow=null;
   const remainLines=[];
   const TODAY = todayKey(); // 실제 오늘 (보고 있는 날짜 아님)
   for(let li=0; li<workLines.length; li++){
     const line=workLines[li];
-    if(/^오늘$/.test(line)){dateKey=TODAY;continue;}
+    if(/^오늘$/.test(line)){dateKey=TODAY;dateExplicit=true;continue;}
     if(/^(내일|낼)$/.test(line)){
       const d=new Date(TODAY+'T00:00:00');d.setDate(d.getDate()+1);
-      dateKey=`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;continue;
+      dateKey=`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;dateExplicit=true;continue;
     }
     if(/^모레$/.test(line)){
       const d=new Date(TODAY+'T00:00:00');d.setDate(d.getDate()+2);
-      dateKey=`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;continue;
+      dateKey=`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;dateExplicit=true;continue;
     }
     const nextWeekMatch=line.match(/^(다음\s*주|담주)\s*([월화수목금토일])요?일?$/);
     if(nextWeekMatch){
@@ -719,13 +719,17 @@ function parseReservationText(raw){
       dateKey=`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;continue;
     }
     if(/^[월화수목금토일]요?일?$/.test(line)){
-      const dow=DAY_MAP[line[0]];const d=new Date(TODAY+'T00:00:00');
+      const dow=DAY_MAP[line[0]];
+      statedDow=dow;
+      // "18일 목요일"처럼 날짜가 앞에 있으면 아래에서 실제 요일 일치 여부를 검증
+      if(dateExplicit) continue;
+      const d=new Date(TODAY+'T00:00:00');
       let diff=dow-d.getDay();if(diff<0)diff+=7;
       d.setDate(d.getDate()+diff);
       dateKey=`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;continue;
     }
     const dm=line.match(/^(\d{1,2})[\/월](\d{1,2})일?$/);
-    if(dm){dateKey=`${new Date().getFullYear()}-${dm[1].padStart(2,'0')}-${dm[2].padStart(2,'0')}`;continue;}
+    if(dm){dateKey=`${new Date().getFullYear()}-${dm[1].padStart(2,'0')}-${dm[2].padStart(2,'0')}`;dateExplicit=true;continue;}
     // N일 단독 (예: "12일") - 이번 달 또는 다음 달 해당 일자
     const dayOnly=line.match(/^(\d{1,2})일$/);
     if(dayOnly){
@@ -735,7 +739,7 @@ function parseReservationText(raw){
       // 오늘보다 이전 일자면 다음 달로
       if(day<t.getDate()) mo++;
       if(mo>11){mo=0;y++;}
-      dateKey=`${y}-${pad(mo+1)}-${pad(day)}`;continue;
+      dateKey=`${y}-${pad(mo+1)}-${pad(day)}`;dateExplicit=true;continue;
     }
     // 시간 토큰 (12시, 12시30, 12시30분, 12:30, 6시반)
     if(!timeStr && /^(오전|오후)?\d{1,2}\s*(시|:)/.test(line) || (!timeStr && /\d/.test(line) && (line.includes('분뒤')||line.includes('분후')||line.includes('시간뒤')||line.includes('시간후')))){
@@ -754,6 +758,13 @@ function parseReservationText(raw){
     }
     // 인원이 "명" 없이 앞에 시간/날짜 다 있고 숫자만 단독일 때 (드뭄) - 건너뜀
     remainLines.push(line);
+  }
+  if(dateExplicit && statedDow!==null){
+    const selectedDate=new Date(dateKey+'T00:00:00');
+    if(selectedDate.getDay()!==statedDow){
+      const dayNames=['일','월','화','수','목','금','토'];
+      return {error:`날짜·요일 불일치 (${selectedDate.getMonth()+1}/${selectedDate.getDate()}은 ${dayNames[selectedDate.getDay()]}요일)`};
+    }
   }
   // remainLines에서 메모성 단어와 이름 분리
   // 메모 키워드: 룸, 갈비, 홀, 한테이블, 유아의자, 대기, 취소, 변경, 도착 등
@@ -2019,7 +2030,7 @@ setInterval(autoSync, 5000);
 
 // ── PWA 서비스워커 등록 ───────────────────────────────
 if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('./service-worker.js?v=10').catch(()=>{});
+  navigator.serviceWorker.register('./service-worker.js?v=12').catch(()=>{});
 }
 
 // ── 알림 기능 ─────────────────────────────────────────
