@@ -24,7 +24,7 @@
   let realtimeChannel = null;
 
   function loginEmail(id) {
-    return id.includes("@") ? id : `${id}@sangmuok.local`;
+    return id.includes("@") ? id : `${id}@sangmuok.app`;
   }
 
   function normalizeTime(value) {
