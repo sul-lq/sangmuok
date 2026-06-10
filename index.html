@@ -472,8 +472,8 @@ tbody td{padding:9px 10px;vertical-align:middle;}
 <button class="fab-add" id="fab-add" onclick="openInputSheet()">+</button>
 
 <script src="./vendor/supabase-2.108.1.min.js"></script>
-<script src="./supabase-config.js"></script>
-<script src="./supabase-store.js"></script>
+<script src="./supabase-config.js?v=5"></script>
+<script src="./supabase-store.js?v=5"></script>
 <script>
 // ── 상태 ─────────────────────────────────────────────
 let currentTab='am', currentDateKey=todayKey(), reservations={}, parsed=null;
@@ -1959,7 +1959,7 @@ setInterval(autoSync, 5000);
 
 // ── PWA 서비스워커 등록 ───────────────────────────────
 if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('./service-worker.js').catch(()=>{});
+  navigator.serviceWorker.register('./service-worker.js?v=5').catch(()=>{});
 }
 
 // ── 알림 기능 ─────────────────────────────────────────
