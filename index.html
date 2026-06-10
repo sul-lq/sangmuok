@@ -348,6 +348,18 @@ tbody td{padding:9px 10px;vertical-align:middle;}
 .cal-day.sat-col{color:#4a7ac8;}
 .cal-today-btn{width:100%;margin-top:10px;background:var(--surface2);border:1px solid var(--border);color:var(--text-dim);border-radius:8px;padding:8px;font-size:12px;cursor:pointer;font-family:'Noto Sans KR',sans-serif;}
 .cal-today-btn:hover{color:var(--text);}
+.print-settings{display:none;position:fixed;inset:0;z-index:2200;background:rgba(36,33,30,.42);align-items:center;justify-content:center;padding:20px;}
+.print-settings.show{display:flex;}
+.print-settings-card{width:100%;max-width:360px;background:#fff;border:1px solid var(--border);border-radius:16px;padding:22px;box-shadow:0 18px 48px rgba(55,45,38,.18);}
+.print-settings-title{font-size:18px;font-weight:700;margin-bottom:18px;}
+.print-settings-label{display:block;font-size:12px;font-weight:700;color:var(--text-dim);margin:14px 0 7px;}
+.print-date{width:100%;border:1px solid var(--border);border-radius:9px;padding:11px 12px;background:var(--surface);color:var(--text);font-size:14px;}
+.print-periods{display:grid;grid-template-columns:repeat(2,1fr);gap:7px;}
+.print-periods label{display:flex;align-items:center;justify-content:center;gap:5px;border:1px solid var(--border);border-radius:9px;padding:10px 6px;font-size:13px;cursor:pointer;}
+.print-settings-actions{display:flex;gap:8px;margin-top:20px;}
+.print-settings-actions button{border-radius:9px;padding:11px;border:1px solid var(--border);font-weight:700;cursor:pointer;}
+.print-cancel{flex:1;background:var(--surface2);color:var(--text);}
+.print-run{flex:2;background:var(--green);border-color:var(--green)!important;color:#fff;}
 </style>
 
 </head>
@@ -360,7 +372,7 @@ tbody td{padding:9px 10px;vertical-align:middle;}
     <span id="current-date-label" onclick="openCalendar()" style="cursor:pointer;border-bottom:1px dashed #aaa29a;padding-bottom:1px"></span>
     <button onclick="changeDate(1)">›</button>
   </div>
-  <button onclick="exportExcel()" style="background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:0 12px;height:30px;cursor:pointer;font-size:12px;margin-left:8px">프린트</button>
+  <button onclick="openPrintSettings()" style="background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:0 12px;height:30px;cursor:pointer;font-size:12px;margin-left:8px">프린트</button>
 </header>
 
 <!-- 캘린더 오버레이 -->
@@ -457,6 +469,26 @@ tbody td{padding:9px 10px;vertical-align:middle;}
     <div style="display:flex;gap:8px">
       <button id="profile-name-cancel" type="button" onclick="closeProfileName()" style="flex:1;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:9px;padding:11px;cursor:pointer">취소</button>
       <button id="profile-name-save" type="button" onclick="saveProfileName()" style="flex:2;background:var(--green);color:#fff;border:none;border-radius:9px;padding:11px;font-weight:700;cursor:pointer">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- 예약지 출력 설정 -->
+<div id="print-settings" class="print-settings" onclick="if(event.target===this)closePrintSettings()">
+  <div class="print-settings-card">
+    <div class="print-settings-title">예약지 프린트</div>
+    <label class="print-settings-label" for="print-date">출력 날짜</label>
+    <input id="print-date" class="print-date" type="date">
+    <span class="print-settings-label">출력할 예약지</span>
+    <div class="print-periods">
+      <label><input type="checkbox" name="print-page" value="am-1" checked> 오전 1층</label>
+      <label><input type="checkbox" name="print-page" value="am-2" checked> 오전 2층</label>
+      <label><input type="checkbox" name="print-page" value="pm-1" checked> 오후 1층</label>
+      <label><input type="checkbox" name="print-page" value="pm-2" checked> 오후 2층</label>
+    </div>
+    <div class="print-settings-actions">
+      <button class="print-cancel" type="button" onclick="closePrintSettings()">취소</button>
+      <button class="print-run" type="button" onclick="printReservations()">예약지 열기</button>
     </div>
   </div>
 </div>
@@ -1767,9 +1799,36 @@ const IS_MOBILE = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
 })();
 
 // ── 프린트 (A4 예약지) ────────────────────────────────
-function exportExcel(){
-  const data=reservations[currentDateKey]||{am:[],pm:[]};
-  const d=new Date(currentDateKey+'T00:00:00');
+function openPrintSettings(){
+  document.getElementById('print-date').value=currentDateKey;
+  document.getElementById('print-settings').classList.add('show');
+}
+
+function closePrintSettings(){
+  document.getElementById('print-settings').classList.remove('show');
+}
+
+function printReservations(){
+  const dateKey=document.getElementById('print-date').value||currentDateKey;
+  const selectedPages=[...document.querySelectorAll('input[name="print-page"]:checked')].map(input=>input.value);
+  if(!selectedPages.length){
+    showBanner('출력할 예약지를 하나 이상 선택하세요');
+    return;
+  }
+  closePrintSettings();
+  exportExcel(dateKey,selectedPages);
+}
+
+function reservationFloor(reservation){
+  const table=String(reservation.table||'').trim();
+  if(/^2층/.test(table)||table==='홀') return 2;
+  const numbers=table.match(/\d+/g)?.map(Number)||[];
+  return numbers.some(number=>number>=51) ? 2 : 1;
+}
+
+function exportExcel(dateKey=currentDateKey,selectedPages=['am-1','am-2','pm-1','pm-2']){
+  const data=reservations[dateKey]||{am:[],pm:[]};
+  const d=new Date(dateKey+'T00:00:00');
   const days=['일','월','화','수','목','금','토'];
   const dateLabel=`${d.getMonth()+1}월 ${d.getDate()}일 ${days[d.getDay()]}요일`;
 
@@ -1792,6 +1851,22 @@ function exportExcel(){
     }
     return html;
   }
+
+  const pageData=[
+    {key:'am-1',title:'오전 · 1층',hours:'11:00~15:59',list:data.am.filter(r=>reservationFloor(r)===1)},
+    {key:'am-2',title:'오전 · 2층',hours:'11:00~15:59',list:data.am.filter(r=>reservationFloor(r)===2)},
+    {key:'pm-1',title:'오후 · 1층',hours:'16:00~21:00',list:data.pm.filter(r=>reservationFloor(r)===1)},
+    {key:'pm-2',title:'오후 · 2층',hours:'16:00~21:00',list:data.pm.filter(r=>reservationFloor(r)===2)}
+  ].filter(page=>selectedPages.includes(page.key));
+  const pages=pageData.map(page=>`
+    <div class="page">
+      <div class="head"><div class="title">${dateLabel} · ${page.title}</div><div class="sub">상무옥 예약 (${page.hours}) · ${page.list.length}건</div></div>
+      <table>
+        <colgroup><col class="c-table"><col class="c-time"><col class="c-name"><col class="c-people"><col class="c-memo"></colgroup>
+        <thead><tr><th>테이블</th><th>시간</th><th>성함</th><th>인원수</th><th>특이사항</th></tr></thead>
+        <tbody>${buildRows(page.list,26)}</tbody>
+      </table>
+    </div>`).join('');
 
   const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${dateLabel} 예약</title>
   <style>
@@ -1817,23 +1892,7 @@ function exportExcel(){
     <button class="btn" onclick="window.close()">닫기</button>
   </div>
 
-  <div class="page">
-    <div class="head"><div class="title">${dateLabel} · 오전</div><div class="sub">상무옥 예약 (11:00~15:59) · ${data.am.length}건</div></div>
-    <table>
-      <colgroup><col class="c-table"><col class="c-time"><col class="c-name"><col class="c-people"><col class="c-memo"></colgroup>
-      <thead><tr><th>테이블</th><th>시간</th><th>성함</th><th>인원수</th><th>특이사항</th></tr></thead>
-      <tbody>${buildRows(data.am, 26)}</tbody>
-    </table>
-  </div>
-
-  <div class="page">
-    <div class="head"><div class="title">${dateLabel} · 오후</div><div class="sub">상무옥 예약 (16:00~21:00) · ${data.pm.length}건</div></div>
-    <table>
-      <colgroup><col class="c-table"><col class="c-time"><col class="c-name"><col class="c-people"><col class="c-memo"></colgroup>
-      <thead><tr><th>테이블</th><th>시간</th><th>성함</th><th>인원수</th><th>특이사항</th></tr></thead>
-      <tbody>${buildRows(data.pm, 26)}</tbody>
-    </table>
-  </div>
+  ${pages}
   </body></html>`;
 
   const w=window.open('','_blank');
@@ -1960,7 +2019,7 @@ setInterval(autoSync, 5000);
 
 // ── PWA 서비스워커 등록 ───────────────────────────────
 if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('./service-worker.js?v=7').catch(()=>{});
+  navigator.serviceWorker.register('./service-worker.js?v=9').catch(()=>{});
 }
 
 // ── 알림 기능 ─────────────────────────────────────────
