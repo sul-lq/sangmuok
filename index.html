@@ -48,6 +48,7 @@ header{padding:12px 20px;border-bottom:1px solid var(--border);display:flex;alig
 .chat-map-drawer.show{transform:translateX(0);}
 .chat-map-head{height:48px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:0 14px;border-bottom:1px solid var(--border);background:#fff;}
 .chat-map-title{font-size:14px;font-weight:700;}
+.chat-map-date{min-width:125px;border:1px solid var(--border);border-radius:7px;background:var(--surface);color:var(--text);padding:6px 7px;font-size:11px;}
 .chat-map-close{width:32px;height:32px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);font-size:20px;cursor:pointer;}
 .chat-map-content{flex:1;overflow:auto;padding:16px;}
 .chat-map-open{border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);font-size:11px;font-weight:700;padding:5px 9px;cursor:pointer;}
@@ -197,6 +198,9 @@ header{padding:12px 20px;border-bottom:1px solid var(--border);display:flex;alig
 .chat-sender-btn{background:var(--surface);border:1px solid var(--border);color:var(--text-dim);border-radius:14px;padding:4px 12px;font-size:12px;cursor:pointer;font-family:'Noto Sans KR',sans-serif;}
 .chat-sender-btn.active{background:var(--green);color:#fff;border-color:var(--green);font-weight:700;}
 .chat-auto-toggle{margin-left:auto;display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-dim);cursor:pointer;}
+.notify-control{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text-dim);}
+.notify-control select{height:28px;border:1px solid var(--border);border-radius:7px;background:var(--surface);color:var(--text);font-size:11px;padding:0 5px;}
+.notify-test{height:28px;border:1px solid var(--border);border-radius:7px;background:var(--surface);color:var(--text);font-size:11px;padding:0 7px;cursor:pointer;}
 
 /* 예약 입력 플로팅 버튼 */
 .fab-add{position:fixed;right:20px;bottom:20px;width:56px;height:56px;border-radius:50%;background:var(--green);color:#fff;border:none;font-size:28px;cursor:pointer;box-shadow:0 8px 24px rgba(51,67,57,.24);z-index:90;display:none;align-items:center;justify-content:center;line-height:1;}
@@ -267,6 +271,9 @@ tbody td{padding:9px 10px;vertical-align:middle;}
 .legend{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:16px;padding:10px 12px;background:var(--surface);border-radius:8px;border:1px solid var(--border);}
 .legend-item{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-dim);}
 .legend-dot{width:12px;height:12px;border-radius:3px;flex-shrink:0;}
+.map-period-control{display:flex;gap:6px;margin-bottom:12px;position:sticky;top:0;z-index:15;background:var(--bg);padding:2px 0 8px;}
+.map-period-btn{flex:1;max-width:150px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text-dim);padding:8px 12px;font-size:12px;font-weight:700;cursor:pointer;}
+.map-period-btn.active{background:var(--green);border-color:var(--green);color:#fff;}
 
 /* 층 섹션 */
 .floor-section{margin-bottom:24px;}
@@ -439,6 +446,16 @@ tbody td{padding:9px 10px;vertical-align:middle;}
       <button id="my-profile" class="profile-name-btn" type="button" onclick="openProfileName(false)" title="사용자 이름 수정"></button>
       <button onclick="logout()" style="background:none;border:none;color:var(--text-dim);font-size:11px;cursor:pointer;text-decoration:underline">로그아웃</button>
       <label class="chat-auto-toggle"><input type="checkbox" id="auto-register" checked> 자동등록</label>
+      <label class="notify-control"><input type="checkbox" id="notify-enabled" onchange="changeNotificationSetting(this.checked)"> 알림</label>
+      <label class="notify-control">
+        <select id="notify-sound" onchange="changeNotificationSound(this.value)" aria-label="알림음">
+          <option value="dingdong">딩동</option>
+          <option value="soft">부드럽게</option>
+          <option value="bell">벨</option>
+          <option value="none">무음</option>
+        </select>
+      </label>
+      <button class="notify-test" type="button" onclick="testNotificationSound()">소리 확인</button>
     </div>
     <div class="chat-messages" id="chat-messages"></div>
     <div class="chat-floating-date" id="chat-floating-date"></div>
@@ -461,6 +478,7 @@ tbody td{padding:9px 10px;vertical-align:middle;}
     <aside id="chat-map-drawer" class="chat-map-drawer" aria-label="예약톡 배치도">
       <div class="chat-map-head">
         <div class="chat-map-title">실시간 배치도</div>
+        <input id="chat-map-date" class="chat-map-date" type="date" onchange="changeChatMapDate(this.value)" aria-label="배치도 날짜">
         <button class="chat-map-close" type="button" onclick="closeChatMap()" aria-label="배치도 닫기">×</button>
       </div>
       <div id="chat-map-content" class="chat-map-content"></div>
@@ -525,13 +543,18 @@ tbody td{padding:9px 10px;vertical-align:middle;}
 <button class="fab-add" id="fab-add" onclick="openInputSheet()">+</button>
 
 <script src="./vendor/supabase-2.108.1.min.js"></script>
-<script src="./supabase-config.js?v=5"></script>
-<script src="./supabase-store.js?v=5"></script>
+<script src="./supabase-config.js?v=15"></script>
+<script src="./supabase-store.js?v=15"></script>
 <script>
 // ── 상태 ─────────────────────────────────────────────
 let currentTab='am', currentDateKey=todayKey(), reservations={}, parsed=null;
 let isSyncing=false;
 let syncRequested=false;
+let notificationSettings=(()=>{
+  try{
+    return {...{enabled:false,sound:'dingdong'},...JSON.parse(localStorage.getItem('sangmuok_notification_settings')||'{}')};
+  }catch{return {enabled:false,sound:'dingdong'};}
+})();
 
 function todayKey(){const d=new Date();return`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;}
 function pad(n){return String(n).padStart(2,'0');}
@@ -621,12 +644,22 @@ function switchTab(tab){
 }
 
 function openChatMap(){
+  const dateInput=document.getElementById('chat-map-date');
+  if(dateInput) dateInput.value=currentDateKey;
   renderMap();
   document.getElementById('chat-map-drawer').classList.add('show');
 }
 
 function closeChatMap(){
   document.getElementById('chat-map-drawer')?.classList.remove('show');
+}
+
+function changeChatMapDate(dateKey){
+  if(!dateKey) return;
+  currentDateKey=dateKey;
+  updateDateLabel();
+  renderMap();
+  renderChat();
 }
 
 // 예약 입력 바텀시트 열기/닫기
@@ -700,7 +733,8 @@ function parseTimeStr(str){
   }
 
   if(pm&&h<12)h+=12;
-  if(am&&h===12)h=0;
+  // 매장 예약에서는 "오전 12시"도 정오 12시 예약으로 처리
+  if(am&&h===12)h=12;
   // 오전 명시 없고 1~9시면 오후로 처리
   if(!am&&!pm&&h>=1&&h<=9)h+=12;
   return{h,m};
@@ -813,7 +847,8 @@ function parseReservationText(raw){
   if(errors.length) return {error:errors.join('·')+' 필요'};
   const slot=timeObj.h<16?'am':'pm';
   const timeLabel=`${pad(timeObj.h)}:${pad(timeObj.m)}`;
-  return {dateKey,timeLabel,timeH:timeObj.h,name,people:people||'',memo:memo.join(' '),slot};
+  const meridiem=timeObj.h>=12?'오후':'오전';
+  return {dateKey,timeLabel,timeH:timeObj.h,meridiem,name,people:people||'',memo:memo.join(' '),slot};
 }
 
 function parseInput(){
@@ -826,7 +861,7 @@ function parseInput(){
   const d=new Date(result.dateKey+'T00:00:00');const days=['일','월','화','수','목','금','토'];
   preview.innerHTML=`
     <div class="pv-row"><span class="pv-label">날짜</span><span class="pv-val">${d.getMonth()+1}/${d.getDate()} (${days[d.getDay()]})</span></div>
-    <div class="pv-row"><span class="pv-label">시간</span><span class="pv-val pv-time-${result.slot}">${escapeHtml(result.timeLabel)} · ${result.slot==='am'?'오전':'오후'}</span></div>
+    <div class="pv-row"><span class="pv-label">시간</span><span class="pv-val pv-time-${result.slot}">${escapeHtml(result.timeLabel)} · ${result.meridiem}</span></div>
     <div class="pv-row"><span class="pv-label">예약자</span><span class="pv-val">${escapeHtml(result.name)}</span></div>
     <div class="pv-row"><span class="pv-label">인원</span><span class="pv-val">${escapeHtml(result.people||'-')}명</span></div>
     ${result.memo?`<div class="pv-row"><span class="pv-label">메모</span><span class="pv-val">${escapeHtml(result.memo)}</span></div>`:''}`;
@@ -841,6 +876,7 @@ function addReservation(){
   if(!reservations[key])reservations[key]={am:[],pm:[]};
   reservations[key][parsed.slot].push({id:Date.now(),time:parsed.timeLabel,timeH:parsed.timeH,name:parsed.name,people:parsed.people,memo:parsed.memo,table:''});
   reservations[key][parsed.slot].sort((a,b)=>a.time.localeCompare(b.time));
+  showCapacityRisk(key,parsed.slot);
   saveToSheet();
   currentDateKey=parsed.dateKey;
   if(currentTab!=='map'){
@@ -868,7 +904,7 @@ function deleteRow(dateKey,slot,id){
 }
 function updateTable(dateKey,slot,id,val){
   const r=reservations[dateKey]?.[slot]?.find(r=>r.id===id);
-  if(r){r.table=val;saveToSheet();}
+  if(r){r.table=val;saveToSheet();showCapacityRisk(dateKey,slot);renderMap();}
 }
 
 // ── 룸 → 테이블 매핑 ─────────────────────────────────
@@ -879,6 +915,38 @@ const ROOM_MAP = {
   '2층7룸':[71,72,73,74,75,76], '홀':[81,82,83,84],
   '창가1':[1,2], '창가2':[3,4], '창가3':[5,6], '창가4':[7,8],
 };
+const ALL_TABLES=[
+  1,2,3,4,5,6,7,8,
+  21,22,23,24,25,26,27,28,
+  31,32,33,34,35,36,
+  41,42,43,44,45,46,47,48,
+  51,52,53,54,55,56,
+  61,62,63,64,
+  71,72,73,74,75,76,
+  81,82,83,84
+];
+let mapPeriod='am';
+
+function setMapPeriod(period){
+  mapPeriod=period==='pm'?'pm':'am';
+  renderMap();
+}
+
+function reservationRound(reservation){
+  const match=`${reservation?.table||''} ${reservation?.memo||''}`.match(/([1-9])\s*차/);
+  return match?Number(match[1]):0;
+}
+
+function bookingColor(time,round=0){
+  const match=String(time||'').match(/^(\d{1,2}):(\d{2})/);
+  const minutes=match?(Number(match[1])*60+Number(match[2])):0;
+  const hue=(minutes*7+35+(round?round*47:0))%360;
+  return {
+    bg:`hsl(${hue} 42% 86%)`,
+    border:`hsl(${hue} 35% 62%)`,
+    text:`hsl(${hue} 40% 28%)`
+  };
+}
 
 // 테이블 값 → 룸명 변환 (배치도 표시용)
 function resolveTableLabel(val){
@@ -898,14 +966,38 @@ function resolveTableLabel(val){
 function tableMatches(tableVal, tNum){
   const t=String(tableVal).trim();
   if(!t) return false;
-  // 룸 이름이면 룸 매칭만 (숫자 추출 안 함)
-  if(ROOM_MAP[t]){
-    return ROOM_MAP[t].includes(tNum);
+  // "1룸 1차", "1룸 2차"처럼 회차가 붙어도 같은 룸 테이블로 매칭
+  const room=Object.keys(ROOM_MAP).find(roomName=>t===roomName||t.startsWith(`${roomName} `));
+  if(room){
+    return ROOM_MAP[room].includes(tNum);
   }
   // 룸 이름이 아니면 숫자만 추출해서 비교 (41T, 41 t, 52.55T 등)
   const nums = t.match(/\d+/g);
   if(nums && nums.map(Number).includes(tNum)) return true;
   return false;
+}
+
+function occupiedTableCount(dateKey,slot){
+  const list=(reservations[dateKey]||{})[slot]||[];
+  return ALL_TABLES.filter(tableNumber=>list.some(r=>tableMatches(r.table,tableNumber))).length;
+}
+
+function capacityStatus(dateKey,slot){
+  const occupied=occupiedTableCount(dateKey,slot);
+  return {occupied,total:ALL_TABLES.length,ratio:occupied/ALL_TABLES.length};
+}
+
+function showCapacityRisk(dateKey,slot){
+  const status=capacityStatus(dateKey,slot);
+  if(status.ratio<0.7) return false;
+  const d=new Date(dateKey+'T00:00:00');
+  const period=slot==='am'?'오전':'오후';
+  const percent=Math.round(status.ratio*100);
+  const title=status.ratio>=1?'배치도 만석 위험':'배치도 혼잡 주의';
+  const body=`${d.getMonth()+1}/${d.getDate()} ${period} 테이블 ${status.occupied}/${status.total}개 (${percent}%) 지정`;
+  showBanner(`${title} · ${body}`);
+  showNotification(title,body,{banner:false});
+  return true;
 }
 
 function getBookings(tNum){
@@ -918,53 +1010,81 @@ function getBookings(tNum){
 }
 function cellClass(tNum){
   const b=getBookings(tNum);
-  if(b.am.length&&b.pm.length)return'booked-both';
-  if(b.am.length)return'booked-am';
-  if(b.pm.length)return'booked-pm';
+  if(b[mapPeriod].length)return mapPeriod==='am'?'booked-am':'booked-pm';
   return'vacant';
+}
+
+function tableBookingStyle(bookings){
+  const colors=[...new Set(bookings.map(r=>bookingColor(r.time,reservationRound(r)).bg))];
+  if(!colors.length) return '';
+  if(colors.length===1){
+    const color=bookingColor(bookings[0].time,reservationRound(bookings[0]));
+    return `background:${color.bg};border-color:${color.border}`;
+  }
+  const step=100/colors.length;
+  const stops=colors.map((color,index)=>`${color} ${index*step}% ${(index+1)*step}%`).join(',');
+  return `background:linear-gradient(135deg,${stops});border-color:#8f867d`;
 }
 
 // ── 테이블 셀 HTML ────────────────────────────────────
 function tblHTML(num){
   const b=getBookings(num);
   const cls=cellClass(num);
+  const visible=b[mapPeriod];
   let chips='';
-  b.am.forEach(r=>{chips+=`<div class="booking-chip chip-am">${escapeHtml(r.time)} ${escapeHtml(r.name)}</div>`;});
-  b.pm.forEach(r=>{chips+=`<div class="booking-chip chip-pm">${escapeHtml(r.time)} ${escapeHtml(r.name)}</div>`;});
+  visible.forEach(r=>{
+    const color=bookingColor(r.time,reservationRound(r));
+    chips+=`<div class="booking-chip" style="background:${color.bg};color:${color.text};border:1px solid ${color.border}">${escapeHtml(r.time)} ${escapeHtml(r.name)}</div>`;
+  });
+  const bookingStyle=tableBookingStyle(visible);
   // 이동 모드: 출발 테이블 강조, 다른 테이블은 선택 대상
   if(moveMode){
     const isFrom = String(moveMode.fromTable)===String(num);
     const moveStyle = isFrom ? 'outline:2px solid var(--am);outline-offset:-2px;opacity:.6' : 'outline:2px dashed var(--green);outline-offset:-2px';
-    return`<div class="tbl-cell ${cls}" style="${moveStyle}" onclick="applyMove(${num})">
+    return`<div class="tbl-cell ${cls}" style="${bookingStyle};${moveStyle}" onclick="applyMove(${num})">
       <div class="tbl-num">${num}</div>${chips}
     </div>`;
   }
-  return`<div class="tbl-cell ${cls}" onclick="showTableDetail(${num})">
+  return`<div class="tbl-cell ${cls}" style="${bookingStyle}" onclick="showTableDetail(${num})">
     <div class="tbl-num">${num}</div>${chips}
   </div>`;
 }
 
 // ── 모바일 팝업 ───────────────────────────────────────
 function showTableDetail(tNum){
-  const b=getBookings(tNum);
-  if(!b.am.length&&!b.pm.length)return;
-  document.getElementById('popup-title').textContent=`${tNum}번 테이블`;
+  const list=(reservations[currentDateKey]||{})[mapPeriod]||[];
+  document.getElementById('popup-title').textContent=`${tNum}번 테이블 · ${mapPeriod==='am'?'오전':'오후'}`;
   let html='';
-  function rowHtml(r,slot){
-    const cls=slot==='am'?'popup-time-am':'popup-time-pm';
+  function rowHtml(r){
+    const assignedHere=tableMatches(r.table,tNum);
+    const cls=mapPeriod==='am'?'popup-time-am':'popup-time-pm';
+    const color=bookingColor(r.time,reservationRound(r));
     return `<div class="popup-row">
-      <span class="${cls}">${escapeHtml(r.time)}</span>
+      <span class="${cls}" style="color:${color.text}">${escapeHtml(r.time)}</span>
       <span class="popup-name">${escapeHtml(r.name)}</span>
       <span class="popup-people">${r.people?escapeHtml(r.people)+'명':''}</span>
-      <button onclick='startMove("${r.dateKey||currentDateKey}","${slot}","${r.id}",${tNum})' style="margin-left:8px;background:var(--am);color:#fff;border:none;border-radius:6px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer">이동</button>
+      <button onclick='assignReservationToTable("${currentDateKey}","${mapPeriod}","${r.id}",${tNum})' style="margin-left:8px;background:${assignedHere?'#9a938c':'var(--green)'};color:#fff;border:none;border-radius:6px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer">${assignedHere?'지정됨':'이 테이블 지정'}</button>
     </div>${r.memo?`<div class="popup-memo" style="padding:2px 0 6px 58px;">${escapeHtml(r.memo)}</div>`:''}`;
   }
-  b.am.forEach(r=>{html+=rowHtml(r,'am');});
-  b.pm.forEach(r=>{html+=rowHtml(r,'pm');});
-  if(!html)html='<div class="popup-empty">예약 없음</div>';
+  list.forEach(r=>{html+=rowHtml(r);});
+  if(!html)html='<div class="popup-empty">이 시간대 예약이 없습니다.</div>';
   document.getElementById('popup-body').innerHTML=html;
   document.getElementById('mobile-popup').classList.add('show');
   document.getElementById('popup-overlay').style.display='block';
+}
+
+function assignReservationToTable(dateKey,slot,id,tableNumber){
+  const reservation=(reservations[dateKey]||{})[slot]?.find(r=>String(r.id)===String(id));
+  if(!reservation) return;
+  reservation.table=String(tableNumber);
+  try{localStorage.setItem('sangmuok_v2',JSON.stringify(reservations));}catch{}
+  autoSyncPaused=true;
+  saveToSheet();
+  setTimeout(()=>{autoSyncPaused=false;},10000);
+  renderMap();
+  showTableDetail(tableNumber);
+  showCapacityRisk(dateKey,slot);
+  showBanner(`${reservation.name} 예약을 ${tableNumber}번 테이블에 지정했습니다`);
 }
 function closePopup(){
   document.getElementById('mobile-popup').classList.remove('show');
@@ -997,6 +1117,7 @@ async function applyMove(toTable){
   r.table = String(toTable);
   moveMode=null;
   saveToSheet();
+  showCapacityRisk(dateKey,slot);
   renderMap();
 
   // 채팅방에 이동 알림 등록
@@ -1005,6 +1126,7 @@ async function applyMove(toTable){
     id: Date.now(),
     time: new Date().toISOString(),
     sender: '시스템',
+    system: true,
     text: `📍 ${d.getMonth()+1}월 ${d.getDate()}일 · ${r.name} ${fromTable}번 → ${toTable}번 이동`
   };
   chatMessages.push(moveMsg);
@@ -1019,12 +1141,16 @@ function renderMap(){
     document.getElementById('map-panel'),
     document.getElementById('chat-map-content')
   ].filter(Boolean);
+  const drawerDate=document.getElementById('chat-map-date');
+  if(drawerDate) drawerDate.value=currentDateKey;
 
+  const controls=`<div class="map-period-control">
+    <button class="map-period-btn ${mapPeriod==='am'?'active':''}" onclick="setMapPeriod('am')">오전 배치</button>
+    <button class="map-period-btn ${mapPeriod==='pm'?'active':''}" onclick="setMapPeriod('pm')">오후 배치</button>
+  </div>`;
   const legend=`<div class="legend">
     <div class="legend-item"><div class="legend-dot" style="background:var(--surface2);border:1px solid var(--border)"></div>빈 테이블</div>
-    <div class="legend-item"><div class="legend-dot" style="background:rgba(120,84,69,.2);border:1px solid var(--am)"></div>오전</div>
-    <div class="legend-item"><div class="legend-dot" style="background:rgba(83,99,106,.2);border:1px solid var(--pm)"></div>오후</div>
-    <div class="legend-item"><div class="legend-dot" style="background:linear-gradient(135deg,rgba(120,84,69,.2) 50%,rgba(83,99,106,.2) 50%);border:1px solid #6b625b"></div>오전+오후</div>
+    <div class="legend-item">같은 예약 시간은 같은 색으로 표시됩니다</div>
   </div>`;
 
   // ── 셀 헬퍼 ──────────────────────────────────────
@@ -1142,7 +1268,7 @@ function renderMap(){
         <button onclick="cancelMove()" style="background:#fff;color:var(--am);border:none;border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer">취소</button>
       </div>`
     : '';
-  const html=moveBar+legend+f1+f2;
+  const html=controls+moveBar+legend+f1+f2;
   panels.forEach(panel=>{panel.innerHTML=html;});
 }
 
@@ -1204,9 +1330,25 @@ let profileNameRequired = false;
 function isMyMessage(message){
   return Boolean(
     message &&
+    !message.system &&
+    message.sender!=='시스템' &&
     ((message.senderId && currentUser?.uid && message.senderId===currentUser.uid) ||
       (!message.senderId && message.sender===currentSender))
   );
+}
+
+function addSystemChat(text){
+  const message={
+    id:Date.now()+Math.random(),
+    time:new Date().toISOString(),
+    sender:'시스템',
+    system:true,
+    text
+  };
+  chatMessages.push(message);
+  saveChat(message);
+  renderChat();
+  return message;
 }
 
 function needsProfileName(user){
@@ -1292,6 +1434,9 @@ async function activateUser(user){
   await Promise.all([loadFromSheet(),loadChats()]);
   SangmuokDB.subscribe(()=>autoSync());
   renderChat();
+  if(notificationSettings?.enabled && 'Notification' in window && Notification.permission==='granted'){
+    ensurePushSubscription().catch(error=>console.warn('백그라운드 알림 구독 실패',error));
+  }
   if(needsProfileName(user)) openProfileName(true);
 }
 
@@ -1459,6 +1604,7 @@ function tryModifyByReply(replyMsg, replyText){
       setTimeout(()=>{autoSyncPaused=false;},10000);
       const d=new Date(dateKey+'T00:00:00');
       const cancelMsg={id:Date.now(),time:new Date().toISOString(),sender:'시스템',
+        system:true,
         text:`❌ ${d.getMonth()+1}월 ${d.getDate()}일 · ${res.name} 예약 취소됨`};
       chatMessages.push(cancelMsg);
       saveChat(cancelMsg);
@@ -1502,6 +1648,7 @@ function tryModifyByReply(replyMsg, replyText){
     setTimeout(()=>{autoSyncPaused=false;},10000);
     const d=new Date(dateKey+'T00:00:00');
     const editMsg={id:Date.now(),time:new Date().toISOString(),sender:'시스템',
+      system:true,
       text:`✏️ ${d.getMonth()+1}월 ${d.getDate()}일 · ${res.name} 수정: ${summary.join(', ')}`};
     chatMessages.push(editMsg);
     saveChat(editMsg);
@@ -1556,13 +1703,26 @@ function attachSwipeReply(){
   });
 }
 
-function askDeleteChat(msgId){
+async function askDeleteChat(msgId){
   const m=chatMessages.find(x=>String(x.id)===String(msgId));
   if(!m) return;
   if(!isMyMessage(m)){ showBanner('본인 메시지만 삭제할 수 있어요'); return; }
-  if(confirm(`이 메시지를 삭제할까요?\n\n"${m.text.slice(0,40)}"`)){
-    deleteChat(m.id);
+  if(!confirm(`이 메시지를 삭제할까요?\n\n"${m.text.slice(0,40)}"`)) return;
+
+  const linked=findReservationFromMessage(m);
+  if(linked&&confirm(`연결된 예약도 함께 취소할까요?\n\n${linked.res.name} ${linked.res.time} ${linked.res.people}명\n\n확인: 예약 취소\n취소: 메시지만 삭제`)){
+    reservations[linked.dateKey][linked.slot]=reservations[linked.dateKey][linked.slot]
+      .filter(r=>String(r.id)!==String(linked.res.id));
+    try{localStorage.setItem('sangmuok_v2',JSON.stringify(reservations));}catch{}
+    autoSyncPaused=true;
+    saveToSheet();
+    setTimeout(()=>{autoSyncPaused=false;},10000);
+    const d=new Date(linked.dateKey+'T00:00:00');
+    addSystemChat(`❌ ${d.getMonth()+1}월 ${d.getDate()}일 · ${linked.res.name} 예약 취소됨 (예약톡 삭제)`);
+    render();
+    renderMap();
   }
+  await deleteChat(m.id);
 }
 
 async function deleteChat(msgId){
@@ -1633,6 +1793,7 @@ function doRegisterFromChat(msgId,result){
   if(!reservations[key])reservations[key]={am:[],pm:[]};
   reservations[key][result.slot].push({id:Date.now()+Math.random(),time:result.timeLabel,timeH:result.timeH,name:result.name,people:result.people,memo:result.memo,table:''});
   reservations[key][result.slot].sort((a,b)=>a.time.localeCompare(b.time));
+  showCapacityRisk(key,result.slot);
   registeredMsgIds.add(msgId);
   saveToSheet();
   renderChat();
@@ -2063,11 +2224,10 @@ setInterval(autoSync, 5000);
 
 // ── PWA 서비스워커 등록 ───────────────────────────────
 if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('./service-worker.js?v=13').catch(()=>{});
+  navigator.serviceWorker.register('./service-worker.js?v=15').catch(()=>{});
 }
 
 // ── 알림 기능 ─────────────────────────────────────────
-let notifyEnabled = false;
 let prevResCount = countAllReservations();
 let prevChatCount = 0;
 
@@ -2077,33 +2237,93 @@ function countAllReservations(){
   return n;
 }
 
+function saveNotificationSettings(){
+  try{localStorage.setItem('sangmuok_notification_settings',JSON.stringify(notificationSettings));}catch{}
+}
+
+function syncNotificationControls(){
+  const enabled=document.getElementById('notify-enabled');
+  const sound=document.getElementById('notify-sound');
+  if(enabled) enabled.checked=notificationSettings.enabled;
+  if(sound) sound.value=notificationSettings.sound;
+}
+
+async function changeNotificationSetting(enabled){
+  notificationSettings.enabled=Boolean(enabled);
+  saveNotificationSettings();
+  try{
+    if(enabled){
+      const permission=await requestNotifyPermission();
+      if(permission!=='granted'){
+        notificationSettings.enabled=false;
+        saveNotificationSettings();
+        syncNotificationControls();
+        showBanner('브라우저 알림 권한을 허용해야 합니다');
+        return;
+      }
+      await ensurePushSubscription();
+    }else{
+      await removePushSubscription();
+    }
+  }catch(error){
+    console.error(error);
+    notificationSettings.enabled=false;
+    saveNotificationSettings();
+    syncNotificationControls();
+    showBanner('백그라운드 알림 설정에 실패했습니다');
+    return;
+  }
+  showBanner(enabled?'예약톡 알림을 켰습니다':'예약톡 알림을 껐습니다');
+}
+
+function changeNotificationSound(sound){
+  notificationSettings.sound=sound;
+  saveNotificationSettings();
+  if(sound!=='none') playNotifySound(sound,true);
+}
+
+function testNotificationSound(){
+  if(notificationSettings.sound==='none'){
+    showBanner('현재 알림음은 무음입니다');
+    return;
+  }
+  playNotifySound(notificationSettings.sound,true);
+}
+
 // 알림음 (웹오디오로 생성 - 외부 파일 불필요)
-function playNotifySound(){
+function playNotifySound(sound=notificationSettings.sound,force=false){
+  if((!notificationSettings.enabled&&!force)||sound==='none') return;
   try{
     const ctx=new (window.AudioContext||window.webkitAudioContext)();
-    const notes=[[880,0],[1175,0.12]]; // 두 음 "딩-동"
-    notes.forEach(([freq,delay])=>{
+    const patterns={
+      dingdong:[[880,0,.3],[1175,.12,.28]],
+      soft:[[523,0,.18],[659,.16,.16]],
+      bell:[[1047,0,.22],[1319,.09,.18],[1568,.18,.14]]
+    };
+    (patterns[sound]||patterns.dingdong).forEach(([freq,delay,volume])=>{
       const o=ctx.createOscillator();
       const g=ctx.createGain();
       o.connect(g);g.connect(ctx.destination);
       o.frequency.value=freq;
-      o.type='sine';
+      o.type=sound==='bell'?'triangle':'sine';
       const t=ctx.currentTime+delay;
       g.gain.setValueAtTime(0,t);
-      g.gain.linearRampToValueAtTime(0.3,t+0.02);
+      g.gain.linearRampToValueAtTime(volume,t+0.02);
       g.gain.exponentialRampToValueAtTime(0.01,t+0.25);
       o.start(t);o.stop(t+0.3);
     });
+    setTimeout(()=>ctx.close().catch(()=>{}),800);
   }catch(e){}
 }
 
 // 화면 알림 (브라우저 알림 권한 있으면 팝업, 없으면 화면 배너)
-function showNotification(title, body){
+function showNotification(title, body, options={}){
+  if(!notificationSettings.enabled) return;
   playNotifySound();
-  if(notifyEnabled && 'Notification' in window && Notification.permission==='granted'){
+  if('Notification' in window && Notification.permission==='granted'){
     try{ new Notification(title,{body, icon:'./icon-192.png', tag:'sangmuok'}); }catch(e){}
   }
-  showBanner(title+' '+body);
+  if(options.banner!==false) showBanner(title+' '+body);
 }
 
 function showBanner(text){
@@ -2123,26 +2343,68 @@ function showBanner(text){
 }
 
 // 알림 권한 요청 (사용자 첫 클릭 시)
-function requestNotifyPermission(){
+async function requestNotifyPermission(){
   if('Notification' in window && Notification.permission==='default'){
-    Notification.requestPermission().then(p=>{ notifyEnabled=(p==='granted'); });
-  }else if('Notification' in window && Notification.permission==='granted'){
-    notifyEnabled=true;
+    return Notification.requestPermission();
   }
+  return 'Notification' in window?Notification.permission:'unsupported';
 }
-document.addEventListener('click', function once(){
-  requestNotifyPermission();
-  document.removeEventListener('click', once);
-}, {once:true});
+
+function urlBase64ToUint8Array(value){
+  const padding='='.repeat((4-value.length%4)%4);
+  const base64=(value+padding).replace(/-/g,'+').replace(/_/g,'/');
+  const raw=atob(base64);
+  return Uint8Array.from([...raw].map(char=>char.charCodeAt(0)));
+}
+
+async function ensurePushSubscription(){
+  if(!currentUser||!('serviceWorker' in navigator)||!('PushManager' in window)) return;
+  if(Notification.permission!=='granted') return;
+  const registration=await navigator.serviceWorker.ready;
+  let subscription=await registration.pushManager.getSubscription();
+  if(!subscription){
+    subscription=await registration.pushManager.subscribe({
+      userVisibleOnly:true,
+      applicationServerKey:urlBase64ToUint8Array(SANGMUOK_CONFIG.vapidPublicKey)
+    });
+  }
+  await SangmuokDB.savePushSubscription(subscription);
+}
+
+async function removePushSubscription(){
+  if(!('serviceWorker' in navigator)) return;
+  const registration=await navigator.serviceWorker.ready;
+  const subscription=await registration.pushManager.getSubscription();
+  if(!subscription) return;
+  try{await SangmuokDB.deletePushSubscription(subscription.endpoint);}catch(error){console.warn(error);}
+  await subscription.unsubscribe();
+}
+
+syncNotificationControls();
 
 // autoSync 후 새 항목 감지해서 알림
 const _origAutoSync = autoSync;
 autoSync = async function(){
+  const beforeCounts={};
+  Object.entries(reservations).forEach(([dateKey,slots])=>{
+    beforeCounts[`${dateKey}:am`]=(slots.am||[]).length;
+    beforeCounts[`${dateKey}:pm`]=(slots.pm||[]).length;
+  });
   await _origAutoSync();
   // 예약 증가 감지
   const nowRes=countAllReservations();
   if(nowRes>prevResCount && prevResCount>=0){
-    showNotification('새 예약', `예약이 ${nowRes-prevResCount}건 추가됐어요`);
+    let risk=null;
+    Object.keys(reservations).forEach(dateKey=>{
+      ['am','pm'].forEach(slot=>{
+        const count=(reservations[dateKey]?.[slot]||[]).length;
+        if(count<=(beforeCounts[`${dateKey}:${slot}`]||0)) return;
+        const status=capacityStatus(dateKey,slot);
+        if(status.ratio>=.7&&(!risk||status.ratio>risk.status.ratio)) risk={dateKey,slot,status};
+      });
+    });
+    if(risk) showCapacityRisk(risk.dateKey,risk.slot);
+    else showNotification('새 예약', `예약이 ${nowRes-prevResCount}건 추가됐어요`);
   }
   prevResCount=nowRes;
   // 채팅 증가 감지

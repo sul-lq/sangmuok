@@ -188,6 +188,47 @@
     return items;
   }
 
+  async function sendPushNotification(title, body, options = {}) {
+    try {
+      const { error } = await client.functions.invoke("push-notification", {
+        body: {
+          title,
+          body,
+          url: options.url || "./?tab=chat",
+          tag: options.tag || "sangmuok"
+        }
+      });
+      if (error) console.warn("백그라운드 알림 전송 실패", error);
+    } catch (error) {
+      console.warn("백그라운드 알림 전송 실패", error);
+    }
+  }
+
+  async function savePushSubscription(subscription) {
+    if (!currentProfile) throw new Error("로그인이 필요합니다.");
+    const json = subscription.toJSON();
+    const { error } = await client.from("push_subscriptions").upsert(
+      {
+        endpoint: json.endpoint,
+        user_id: currentProfile.id,
+        p256dh: json.keys?.p256dh,
+        auth: json.keys?.auth,
+        user_agent: navigator.userAgent
+      },
+      { onConflict: "endpoint" }
+    );
+    if (error) throw error;
+  }
+
+  async function deletePushSubscription(endpoint) {
+    if (!currentProfile || !endpoint) return;
+    const { error } = await client
+      .from("push_subscriptions")
+      .delete()
+      .eq("endpoint", endpoint);
+    if (error) throw error;
+  }
+
   async function performReservationSync(grouped) {
     if (!currentProfile) throw new Error("로그인이 필요합니다.");
 
@@ -219,6 +260,10 @@
         if (error) throw error;
         item.reservation.id = Number(data.id);
         reservationBaseline.set(Number(data.id), comparable(data));
+        sendPushNotification(
+          "새 예약",
+          `${item.dateKey} ${normalizeTime(data.reservation_time)} · ${data.customer_name || "예약"}`
+        );
         continue;
       }
 
@@ -250,6 +295,7 @@
       time: row.created_at,
       senderId: row.sender_id || null,
       sender: row.sender_name || "직원",
+      system: row.sender_type === "system" || row.sender_name === "시스템",
       text: row.message,
       ...(row.reply_to_id ? { replyTo: Number(row.reply_to_id) } : {})
     };
@@ -259,7 +305,7 @@
     const { data, error } = await client
       .from("messages")
       .select(
-        "id, room_id, sender_id, sender_name, message, reply_to_id, created_at"
+        "id, room_id, sender_type, sender_id, sender_name, message, reply_to_id, created_at"
       )
       .order("created_at")
       .limit(1000);
@@ -275,13 +321,19 @@
         room_id: config.roomId,
         sender_type: "staff",
         sender_id: currentProfile.id,
-        sender_name: currentProfile.display_name,
+        sender_name: message.system ? "시스템" : currentProfile.display_name,
         message: message.text,
         reply_to_id: message.replyTo || null
       })
       .select()
       .single();
     if (error) throw error;
+    if (!message.system) {
+      sendPushNotification(
+        currentProfile.display_name,
+        String(message.text || "").slice(0, 80)
+      );
+    }
     return toAppMessage(data);
   }
 
@@ -328,6 +380,9 @@
     signIn,
     signOut,
     updateDisplayName,
+    savePushSubscription,
+    deletePushSubscription,
+    sendPushNotification,
     loadReservations,
     syncReservations,
     loadMessages,

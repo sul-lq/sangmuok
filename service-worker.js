@@ -1,5 +1,5 @@
 // 상무옥 예약관리 Service Worker
-const CACHE_NAME = 'sangmuok-v13';
+const CACHE_NAME = 'sangmuok-v15';
 const ASSETS = [
   './index.html',
   './manifest.json',
@@ -41,5 +41,42 @@ self.addEventListener('fetch', e => {
         return res;
       })
       .catch(() => caches.match(e.request))
+  );
+});
+
+self.addEventListener('push', event => {
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch {
+    data = { body: event.data?.text() || '새 알림이 있습니다.' };
+  }
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
+      if (list.some(client => client.visibilityState === 'visible')) return;
+      return self.registration.showNotification(data.title || '상무옥 예약관리', {
+        body: data.body || '',
+        icon: data.icon || './icon-192.png',
+        badge: data.badge || './icon-192.png',
+        tag: data.tag || 'sangmuok',
+        data: { url: data.url || './' },
+        renotify: true
+      });
+    })
+  );
+});
+
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  const targetUrl = new URL(event.notification.data?.url || './', self.location.origin).href;
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
+      const existing = list.find(client => client.url.startsWith(self.location.origin));
+      if (existing) {
+        existing.navigate(targetUrl);
+        return existing.focus();
+      }
+      return clients.openWindow(targetUrl);
+    })
   );
 });
