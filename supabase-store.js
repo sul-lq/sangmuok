@@ -31,6 +31,24 @@
     return String(value || "12:00").slice(0, 5);
   }
 
+  function normalizePeople(value) {
+    return String(value || "")
+      .replace(/명/g, "")
+      .replace(/[.+]/g, "/")
+      .replace(/\s+/g, "")
+      .trim();
+  }
+
+  function totalPeople(value) {
+    const normalized = normalizePeople(value);
+    if (!normalized) return null;
+    const parts = normalized
+      .split("/")
+      .map(Number)
+      .filter(Number.isFinite);
+    return parts.length ? parts.reduce((sum, number) => sum + number, 0) : null;
+  }
+
   function toAppReservation(row) {
     const time = normalizeTime(row.reservation_time);
     const timeH = Number(time.split(":")[0]);
@@ -39,7 +57,7 @@
       time,
       timeH,
       name: row.customer_name || "",
-      people: String(row.people_count || ""),
+      people: normalizePeople(row.people_detail || row.people_count),
       memo: row.memo || "",
       table: row.table_name || "",
       phone: row.phone || "",
@@ -54,7 +72,8 @@
       phone: reservation.phone || null,
       reservation_date: dateKey,
       reservation_time: `${normalizeTime(reservation.time)}:00`,
-      people_count: Number(reservation.people) || null,
+      people_count: totalPeople(reservation.people),
+      people_detail: normalizePeople(reservation.people) || null,
       room_requested: Boolean(
         reservation.roomRequested || /룸/.test(reservation.memo || "")
       ),
@@ -74,6 +93,7 @@
       reservation_date: row.reservation_date,
       reservation_time: `${normalizeTime(row.reservation_time)}:00`,
       people_count: row.people_count == null ? null : Number(row.people_count),
+      people_detail: normalizePeople(row.people_detail) || null,
       room_requested: Boolean(row.room_requested),
       memo: row.memo || "",
       status: row.status || "pending",
@@ -168,7 +188,7 @@
     const { data, error } = await client
       .from("reservations")
       .select(
-        "id, customer_name, phone, reservation_date, reservation_time, people_count, room_requested, memo, status, updated_by, table_name, created_by"
+        "id, customer_name, phone, reservation_date, reservation_time, people_count, people_detail, room_requested, memo, status, updated_by, table_name, created_by"
       )
       .order("reservation_date")
       .order("reservation_time");

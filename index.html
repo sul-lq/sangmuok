@@ -46,6 +46,10 @@ header{padding:12px 20px;border-bottom:1px solid var(--border);display:flex;alig
 .chat-panel.active{display:flex;}
 .chat-map-drawer{position:absolute;top:0;right:0;bottom:0;width:50%;background:var(--bg);border-left:1px solid var(--border);box-shadow:-12px 0 30px rgba(55,45,38,.12);z-index:35;transform:translateX(102%);transition:transform .25s ease;display:flex;flex-direction:column;}
 .chat-map-drawer.show{transform:translateX(0);}
+.chat-map-handle{position:absolute;left:-42px;top:50%;transform:translateY(-50%);width:42px;height:76px;border:1px solid var(--border);border-right:none;border-radius:14px 0 0 14px;background:var(--surface);color:var(--green);box-shadow:-7px 3px 16px rgba(55,45,38,.13);font-size:28px;font-weight:700;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:36;touch-action:manipulation;}
+.chat-map-handle::before{content:'‹';}
+.chat-map-drawer.show .chat-map-handle::before{content:'›';}
+.chat-map-handle:active{background:var(--surface2);}
 .chat-map-head{height:48px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:0 14px;border-bottom:1px solid var(--border);background:#fff;}
 .chat-map-title{font-size:14px;font-weight:700;}
 .chat-map-date{min-width:125px;border:1px solid var(--border);border-radius:7px;background:var(--surface);color:var(--text);padding:6px 7px;font-size:11px;}
@@ -243,16 +247,16 @@ textarea::placeholder{color:#a39b93;}
 .section-title{font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;}
 .section-title.am{color:var(--am);}.section-title.pm{color:var(--pm);}
 .section-count{font-size:11px;color:var(--text-dim);font-family:'DM Mono',monospace;}
-table{width:100%;border-collapse:collapse;font-size:13px;margin-bottom:24px;}
+table{width:100%;border-collapse:collapse;font-size:15px;margin-bottom:24px;}
 thead th{padding:7px 10px;text-align:left;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text-dim);border-bottom:1px solid var(--border);}
 tbody tr{border-bottom:1px solid #e7e2dc;}
 tbody tr:hover{background:#fbfaf8;}
-tbody td{padding:9px 10px;vertical-align:middle;}
-.td-time{font-family:'DM Mono',monospace;font-size:13px;font-weight:500;}
+tbody td{padding:15px 10px;vertical-align:middle;line-height:1.65;}
+.td-time{font-family:'Noto Sans KR',sans-serif;font-size:16px;font-weight:800;white-space:nowrap;}
 .td-time.am{color:var(--am);}.td-time.pm{color:var(--pm);}
-.td-name{font-weight:500;}
-.td-people{font-family:'DM Mono',monospace;font-size:12px;color:var(--text-dim);}
-.td-memo{font-size:12px;color:var(--text-dim);}
+.td-name{font-size:17px;font-weight:800;text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:6px;}
+.td-people{font-family:'Noto Sans KR',sans-serif;font-size:15px;font-weight:800;color:var(--text);}
+.td-memo{font-size:14px;font-weight:600;color:var(--text-dim);}
 .btn-del{background:none;border:none;color:#aaa29a;cursor:pointer;font-size:14px;padding:4px 6px;border-radius:4px;}
 .btn-del:hover{color:var(--accent);}
 .empty-state{text-align:center;padding:48px 0;color:#918981;font-size:13px;}
@@ -316,7 +320,7 @@ tbody td{padding:9px 10px;vertical-align:middle;}
 .tbl-cell.booked-am .tbl-num{color:var(--am);}
 .tbl-cell.booked-pm .tbl-num{color:var(--pm);}
 .tbl-cell.booked-both .tbl-num{color:#564f49;}
-.booking-chip{font-size:9px;line-height:1.3;text-align:center;width:100%;padding:1px 2px;border-radius:2px;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.booking-chip{font-size:10px;font-weight:800;line-height:1.45;text-align:center;width:100%;padding:2px 3px;border-radius:2px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .chip-am{background:rgba(120,84,69,.13);color:var(--am);}
 .chip-pm{background:rgba(83,99,106,.13);color:var(--pm);}
 
@@ -330,8 +334,10 @@ tbody td{padding:9px 10px;vertical-align:middle;}
 .popup-handle{width:36px;height:4px;background:#c7c0b8;border-radius:2px;margin:0 auto 16px;}
 .popup-title{font-size:14px;font-weight:700;color:#4e4842;margin-bottom:12px;font-family:'DM Mono',monospace;}
 .popup-row{display:flex;gap:10px;padding:6px 0;border-bottom:1px solid #ebe7e2;font-size:13px;align-items:center;}
-.popup-time-am{color:var(--am);font-weight:700;font-family:'DM Mono',monospace;min-width:48px;}
-.popup-time-pm{color:var(--pm);font-weight:700;font-family:'DM Mono',monospace;min-width:48px;}
+.popup-time-am{color:var(--am);font-size:15px;font-weight:800;font-family:'Noto Sans KR',sans-serif;min-width:58px;}
+.popup-time-pm{color:var(--pm);font-size:15px;font-weight:800;font-family:'Noto Sans KR',sans-serif;min-width:58px;}
+.popup-name{font-size:16px;font-weight:800;text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:5px;}
+.popup-people{font-size:14px;font-weight:800;}
 .popup-name{font-weight:500;}
 .popup-people{color:var(--text-dim);font-size:12px;margin-left:auto;}
 .popup-memo{color:#7f7770;font-size:11px;}
@@ -476,6 +482,7 @@ tbody td{padding:9px 10px;vertical-align:middle;}
       </button>
     </div>
     <aside id="chat-map-drawer" class="chat-map-drawer" aria-label="예약톡 배치도">
+      <button id="chat-map-handle" class="chat-map-handle" type="button" onclick="toggleChatMap()" aria-label="배치도 펼치기"></button>
       <div class="chat-map-head">
         <div class="chat-map-title">실시간 배치도</div>
         <input id="chat-map-date" class="chat-map-date" type="date" onchange="changeChatMapDate(this.value)" aria-label="배치도 날짜">
@@ -543,8 +550,8 @@ tbody td{padding:9px 10px;vertical-align:middle;}
 <button class="fab-add" id="fab-add" onclick="openInputSheet()">+</button>
 
 <script src="./vendor/supabase-2.108.1.min.js"></script>
-<script src="./supabase-config.js?v=16"></script>
-<script src="./supabase-store.js?v=16"></script>
+<script src="./supabase-config.js?v=18"></script>
+<script src="./supabase-store.js?v=18"></script>
 <script>
 // ── 상태 ─────────────────────────────────────────────
 let currentTab='am', currentDateKey=todayKey(), reservations={}, parsed=null;
@@ -647,11 +654,20 @@ function openChatMap(){
   const dateInput=document.getElementById('chat-map-date');
   if(dateInput) dateInput.value=currentDateKey;
   renderMap();
-  document.getElementById('chat-map-drawer').classList.add('show');
+  const drawer=document.getElementById('chat-map-drawer');
+  drawer.classList.add('show');
+  document.getElementById('chat-map-handle')?.setAttribute('aria-label','배치도 접기');
 }
 
 function closeChatMap(){
   document.getElementById('chat-map-drawer')?.classList.remove('show');
+  document.getElementById('chat-map-handle')?.setAttribute('aria-label','배치도 펼치기');
+}
+
+function toggleChatMap(){
+  const drawer=document.getElementById('chat-map-drawer');
+  if(drawer?.classList.contains('show')) closeChatMap();
+  else openChatMap();
 }
 
 function changeChatMapDate(dateKey){
@@ -893,9 +909,15 @@ function addReservation(){
 }
 function deleteRow(dateKey,slot,id){
   if(!reservations[dateKey]?.[slot])return;
-  if(!confirm('이 예약을 삭제할까요?'))return;
+  const reservation=reservations[dateKey][slot].find(r=>String(r.id)===String(id));
+  if(!reservation)return;
+  if(!confirm(`${reservation.name} 예약을 삭제할까요?`))return;
   reservations[dateKey][slot]=reservations[dateKey][slot].filter(r=>String(r.id)!==String(id));
   try{localStorage.setItem('sangmuok_v2',JSON.stringify(reservations));}catch{}
+  const d=new Date(dateKey+'T00:00:00');
+  addSystemChat(
+    `❌ ${d.getMonth()+1}월 ${d.getDate()}일 · ${reservation.name} ${displayTime(reservation.time)} ${displayPeople(reservation.people)} 예약 취소됨 (예약지 삭제)`
+  );
   render();
   // 삭제 저장 중에는 실시간 재조회로 항목이 잠시 복원되지 않도록 차단
   autoSyncPaused=true;
@@ -946,6 +968,25 @@ function bookingColor(time,round=0){
     border:`hsl(${hue} 35% 62%)`,
     text:`hsl(${hue} 40% 28%)`
   };
+}
+
+function displayTime(time){
+  const match=String(time||'').match(/^(\d{1,2}):(\d{2})/);
+  if(!match) return String(time||'');
+  let hour=Number(match[1]);
+  const minute=Number(match[2]);
+  if(hour>12) hour-=12;
+  if(hour===0) hour=12;
+  return minute?`${hour}시 ${minute}분`:`${hour}시`;
+}
+
+function displayPeople(people){
+  const value=String(people||'')
+    .replace(/명/g,'')
+    .replace(/[.+]/g,'/')
+    .replace(/\s+/g,'')
+    .trim();
+  return value?`${value}명`:'-';
 }
 
 // 테이블 값 → 룸명 변환 (배치도 표시용)
@@ -1068,7 +1109,7 @@ function tblHTML(num){
   let chips='';
   visible.forEach(r=>{
     const color=bookingColor(r.time,reservationRound(r));
-    chips+=`<div class="booking-chip" style="background:${color.bg};color:${color.text};border:1px solid ${color.border}">${escapeHtml(r.time)} ${escapeHtml(r.name)}</div>`;
+    chips+=`<div class="booking-chip" style="background:${color.bg};color:${color.text};border:1px solid ${color.border}">${escapeHtml(displayTime(r.time))} ${escapeHtml(r.name)}</div>`;
   });
   const bookingStyle=tableBookingStyle(visible);
   // 이동 모드: 출발 테이블 강조, 다른 테이블은 선택 대상
@@ -1086,22 +1127,31 @@ function tblHTML(num){
 
 // ── 모바일 팝업 ───────────────────────────────────────
 function showTableDetail(tNum){
-  const list=(reservations[currentDateKey]||{})[mapPeriod]||[];
-  document.getElementById('popup-title').textContent=`${tNum}번 테이블 · ${mapPeriod==='am'?'오전':'오후'}`;
+  const allReservations=(reservations[currentDateKey]||{})[mapPeriod]||[];
+  const tableReservations=allReservations.filter(r=>tableMatches(r.table,tNum));
+  const isOccupied=tableReservations.length>0;
+  const list=isOccupied
+    ? tableReservations
+    : allReservations.filter(r=>assignedTableNumbers(r.table).length===0);
+  document.getElementById('popup-title').textContent=isOccupied
+    ? `${tNum}번 테이블 예약 · ${mapPeriod==='am'?'오전':'오후'}`
+    : `${tNum}번 빈 테이블에 지정 · ${mapPeriod==='am'?'오전':'오후'}`;
   let html='';
   function rowHtml(r){
     const assignedHere=tableMatches(r.table,tNum);
     const cls=mapPeriod==='am'?'popup-time-am':'popup-time-pm';
     const color=bookingColor(r.time,reservationRound(r));
     return `<div class="popup-row">
-      <span class="${cls}" style="color:${color.text}">${escapeHtml(r.time)}</span>
+      <span class="${cls}" style="color:${color.text}">${escapeHtml(displayTime(r.time))}</span>
       <span class="popup-name">${escapeHtml(r.name)}</span>
-      <span class="popup-people">${r.people?escapeHtml(r.people)+'명':''}</span>
+      <span class="popup-people">${escapeHtml(displayPeople(r.people))}</span>
       <button onclick='assignReservationToTable("${currentDateKey}","${mapPeriod}","${r.id}",${tNum})' style="margin-left:8px;background:${assignedHere?'#9a938c':'var(--green)'};color:#fff;border:none;border-radius:6px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer">${assignedHere?'지정됨':'이 테이블 지정'}</button>
     </div>${r.memo?`<div class="popup-memo" style="padding:2px 0 6px 58px;">${escapeHtml(r.memo)}</div>`:''}`;
   }
   list.forEach(r=>{html+=rowHtml(r);});
-  if(!html)html='<div class="popup-empty">이 시간대 예약이 없습니다.</div>';
+  if(!html){
+    html=`<div class="popup-empty">${isOccupied?'이 테이블 예약이 없습니다.':'미지정 예약이 없습니다.'}</div>`;
+  }
   document.getElementById('popup-body').innerHTML=html;
   document.getElementById('mobile-popup').classList.add('show');
   document.getElementById('popup-overlay').style.display='block';
@@ -1317,15 +1367,15 @@ function render(){
   const cc=currentTab;
   const slotLabel=cc==='am'?'오전 (11:00~15:59)':'오후 (16:00~21:00)';
   let totalPeople=0;
-  list.forEach(r=>{r.people.split(/[\/+\.]/).map(n=>parseInt(n)).filter(n=>!isNaN(n)).forEach(n=>totalPeople+=n);});
+  list.forEach(r=>{String(r.people||'').split(/[\/+\.]/).map(n=>parseInt(n)).filter(n=>!isNaN(n)).forEach(n=>totalPeople+=n);});
   if(!list.length){
     panel.innerHTML=`<div class="section-header"><div class="section-dot ${cc}"></div><div class="section-title ${cc}">${slotLabel}</div></div><div class="empty-state"><span class="emoji">📋</span>예약 없음</div>`;
     return;
   }
   const rows=list.map(r=>`<tr>
-    <td class="td-time ${cc}">${escapeHtml(r.time)}</td>
+    <td class="td-time ${cc}">${escapeHtml(displayTime(r.time))}</td>
     <td class="td-name">${escapeHtml(r.name)}</td>
-    <td class="td-people">${r.people?escapeHtml(r.people)+'명':'-'}</td>
+    <td class="td-people">${escapeHtml(displayPeople(r.people))}</td>
     <td><input class="td-table-input" value="${escapeHtml(r.table)}" placeholder="미배정" onchange="updateTable('${currentDateKey}','${cc}',${r.id},this.value)" onclick="event.stopPropagation()"></td>
     <td class="td-memo">${escapeHtml(r.memo)}</td>
     <td><button class="btn-del" onclick="deleteRow('${currentDateKey}','${cc}',${r.id})">✕</button></td>
@@ -1881,7 +1931,7 @@ function renderChat(){
       const rd=new Date(result.dateKey+'T00:00:00');
       const registered = registeredMsgIds.has(m.id) || isAlreadyReserved(result);
       parsedHtml=`<div class="chat-msg-parsed">
-        <div class="chat-parsed-info">📋 <b>${rd.getMonth()+1}/${rd.getDate()}</b> ${escapeHtml(result.timeLabel)} · <b>${escapeHtml(result.name)}</b> ${result.people?escapeHtml(result.people)+'명':''} ${result.memo?'· '+escapeHtml(result.memo):''}</div>
+        <div class="chat-parsed-info">📋 <b>${rd.getMonth()+1}/${rd.getDate()}</b> ${escapeHtml(displayTime(result.timeLabel))} · <b><u>${escapeHtml(result.name)}</u></b> <b>${escapeHtml(displayPeople(result.people))}</b> ${result.memo?'· '+escapeHtml(result.memo):''}</div>
         ${registered
           ? `<button class="chat-register-btn done">✓ 등록됨</button>`
           : `<button class="chat-register-btn" onclick='doRegisterFromChatById(${m.id})'>예약 등록</button>`}
@@ -2081,9 +2131,9 @@ function exportExcel(dateKey=currentDateKey,selectedPages=['am-1','am-2','pm-1',
     list.forEach(r=>{
       html+=`<tr>
         <td>${escapeHtml(r.table)}</td>
-        <td>${escapeHtml(r.time)}</td>
-        <td>${escapeHtml(r.name)}</td>
-        <td style="text-align:center">${escapeHtml(r.people)}</td>
+        <td class="print-time">${escapeHtml(displayTime(r.time))}</td>
+        <td class="print-name">${escapeHtml(r.name)}</td>
+        <td class="print-people" style="text-align:center">${escapeHtml(displayPeople(r.people))}</td>
         <td>${escapeHtml(r.memo)}</td>
       </tr>`;
     });
@@ -2122,10 +2172,12 @@ function exportExcel(dateKey=currentDateKey,selectedPages=['am-1','am-2','pm-1',
     .head .title{font-size:20px;font-weight:bold;}
     .head .sub{font-size:13px;}
     table{width:100%;border-collapse:collapse;table-layout:fixed;}
-    th,td{border:1px solid #000;height:40px;font-size:14px;padding:4px 8px;vertical-align:middle;}
+    th,td{border:1px solid #000;height:46px;font-size:16px;padding:7px 9px;vertical-align:middle;line-height:1.45;}
     th{background:#e8e8e8;text-align:center;font-weight:bold;height:30px;}
     col.c-table{width:18%;} col.c-time{width:15%;} col.c-name{width:25%;} col.c-people{width:12%;} col.c-memo{width:30%;}
     td{overflow:hidden;white-space:nowrap;}
+    .print-time,.print-name,.print-people{font-weight:800;}
+    .print-name{text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:5px;}
     .toolbar{padding:10px;text-align:center;}
     @media print{.toolbar{display:none;}}
     .btn{padding:8px 24px;font-size:14px;cursor:pointer;margin:0 4px;}
@@ -2262,7 +2314,7 @@ setInterval(autoSync, 5000);
 
 // ── PWA 서비스워커 등록 ───────────────────────────────
 if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('./service-worker.js?v=16').catch(()=>{});
+  navigator.serviceWorker.register('./service-worker.js?v=18').catch(()=>{});
 }
 
 // ── 알림 기능 ─────────────────────────────────────────
