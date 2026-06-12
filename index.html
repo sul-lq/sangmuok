@@ -543,8 +543,8 @@ tbody td{padding:9px 10px;vertical-align:middle;}
 <button class="fab-add" id="fab-add" onclick="openInputSheet()">+</button>
 
 <script src="./vendor/supabase-2.108.1.min.js"></script>
-<script src="./supabase-config.js?v=15"></script>
-<script src="./supabase-store.js?v=15"></script>
+<script src="./supabase-config.js?v=16"></script>
+<script src="./supabase-store.js?v=16"></script>
 <script>
 // ── 상태 ─────────────────────────────────────────────
 let currentTab='am', currentDateKey=todayKey(), reservations={}, parsed=null;
@@ -951,30 +951,64 @@ function bookingColor(time,round=0){
 // 테이블 값 → 룸명 변환 (배치도 표시용)
 function resolveTableLabel(val){
   if(!val) return '';
-  const v = val.trim();
-  // 숫자면 그대로
-  if(/^\d+$/.test(v)) return v;
-  // 룸 이름이면 첫 번째 테이블 번호 반환 (배치도 매칭용)
-  for(const [room, tables] of Object.entries(ROOM_MAP)){
-    if(v===room) return String(tables[0]);
-  }
-  return v;
+  const tables=assignedTableNumbers(val);
+  return tables.length?tables.join(','):String(val).trim();
 }
 
-// 배치도에서 테이블 번호 매칭 (룸명 포함)
-// 배치도에서 테이블 번호 매칭 (룸명, T접미사 포함)
+// 룸 여러 개, 개별 테이블, 연속 범위를 실제 테이블 번호 목록으로 변환
+function assignedTableNumbers(tableVal){
+  let text=String(tableVal||'')
+    .replace(/[－–—∼]/g,'~')
+    .replace(/\s+/g,' ')
+    .trim();
+  if(!text) return [];
+
+  const assigned=new Set();
+  const addRoom=roomName=>{
+    (ROOM_MAP[roomName]||[]).forEach(number=>assigned.add(number));
+  };
+
+  // "2층 5,6룸", "2층 5룸 2층 6룸"은 2층 룸으로 먼저 처리한다.
+  text=text.replace(/2\s*층\s*([5-7](?:\s*[,·/+&]\s*[5-7])*)\s*룸/g,(_,rooms)=>{
+    rooms.split(/\s*[,·/+&]\s*/).forEach(room=>addRoom(`2층${room}룸`));
+    return ' ';
+  });
+
+  // "5,6룸", "5룸 6룸"처럼 여러 룸을 한 예약에 배정할 수 있다.
+  text=text.replace(/([1-8](?:\s*[,·/+&]\s*[1-8])*)\s*룸/g,(_,rooms)=>{
+    rooms.split(/\s*[,·/+&]\s*/).forEach(room=>addRoom(`${room}룸`));
+    return ' ';
+  });
+
+  text=text.replace(/홀/g,()=>{
+    addRoom('홀');
+    return ' ';
+  });
+
+  // "81-83", "81~83", "81번부터 83번까지"는 사이 번호까지 모두 포함한다.
+  text=text.replace(/(\d{1,2})\s*(?:번)?\s*(?:-|~|부터)\s*(\d{1,2})\s*(?:번)?\s*(?:까지)?/g,(_,startRaw,endRaw)=>{
+    const start=Number(startRaw),end=Number(endRaw);
+    const step=start<=end?1:-1;
+    for(let number=start;;number+=step){
+      if(ALL_TABLES.includes(number)) assigned.add(number);
+      if(number===end) break;
+    }
+    return ' ';
+  });
+
+  // 회차 숫자는 테이블 번호가 아니다.
+  text=text.replace(/\d+\s*차/g,' ');
+  (text.match(/\d{1,2}/g)||[])
+    .map(Number)
+    .filter(number=>ALL_TABLES.includes(number))
+    .forEach(number=>assigned.add(number));
+
+  return [...assigned];
+}
+
+// 배치도에서 테이블 번호 매칭 (룸명, 범위, T접미사 포함)
 function tableMatches(tableVal, tNum){
-  const t=String(tableVal).trim();
-  if(!t) return false;
-  // "1룸 1차", "1룸 2차"처럼 회차가 붙어도 같은 룸 테이블로 매칭
-  const room=Object.keys(ROOM_MAP).find(roomName=>t===roomName||t.startsWith(`${roomName} `));
-  if(room){
-    return ROOM_MAP[room].includes(tNum);
-  }
-  // 룸 이름이 아니면 숫자만 추출해서 비교 (41T, 41 t, 52.55T 등)
-  const nums = t.match(/\d+/g);
-  if(nums && nums.map(Number).includes(tNum)) return true;
-  return false;
+  return assignedTableNumbers(tableVal).includes(Number(tNum));
 }
 
 function occupiedTableCount(dateKey,slot){
@@ -1579,8 +1613,12 @@ function analyzeChange(text){
   else if(addMatch){ changes.peopleAdd=parseInt(addMatch[1]); }
   else if(peopleMatch && /변경|으로|로|명$/.test(t)){ changes.people=peopleMatch[1].replace(/[.+]/g,'/'); }
   // 테이블 변경
-  const tableMatch=t.match(/(\d{1,2}\s*[Tt]|[1-8]룸|홀)/);
-  if(tableMatch && /테이블|자리|[Tt]|룸|배치/.test(t)){ changes.table=tableMatch[1].replace(/\s/g,''); }
+  if(assignedTableNumbers(t).length && /테이블|자리|[Tt]|룸|홀|배치/.test(t)){
+    changes.table=t
+      .replace(/테이블|자리|배치|변경|수정|지정|해주세요|해줘|으로/g,' ')
+      .replace(/\s+/g,' ')
+      .trim();
+  }
   return changes;
 }
 
@@ -2026,8 +2064,8 @@ function printReservations(){
 
 function reservationFloor(reservation){
   const table=String(reservation.table||'').trim();
-  if(/^2층/.test(table)||table==='홀') return 2;
-  const numbers=table.match(/\d+/g)?.map(Number)||[];
+  if(/2\s*층/.test(table)||table.includes('홀')) return 2;
+  const numbers=assignedTableNumbers(table);
   return numbers.some(number=>number>=51) ? 2 : 1;
 }
 
@@ -2224,7 +2262,7 @@ setInterval(autoSync, 5000);
 
 // ── PWA 서비스워커 등록 ───────────────────────────────
 if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('./service-worker.js?v=15').catch(()=>{});
+  navigator.serviceWorker.register('./service-worker.js?v=16').catch(()=>{});
 }
 
 // ── 알림 기능 ─────────────────────────────────────────
