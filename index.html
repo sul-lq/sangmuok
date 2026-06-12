@@ -88,6 +88,22 @@ header{padding:12px 20px;border-bottom:1px solid var(--border);display:flex;alig
 .chat-msg.mine .chat-msg-sender{color:var(--green);}
 .chat-msg-text{font-size:14px;line-height:1.5;white-space:pre-wrap;word-break:break-word;}
 .chat-msg-time{font-size:9px;color:var(--text-dim);margin-top:4px;text-align:right;}
+.message-action-overlay{display:none;position:fixed;inset:0;background:rgba(36,33,30,.28);z-index:2200;}
+.message-action-overlay.show{display:block;}
+.message-action-sheet{position:absolute;left:50%;bottom:max(22px,env(safe-area-inset-bottom));transform:translateX(-50%);width:min(360px,calc(100% - 28px));background:#fff;border:1px solid var(--border);border-radius:16px;padding:8px;box-shadow:0 18px 50px rgba(36,33,30,.2);}
+.message-action-preview{padding:11px 12px;color:var(--text-dim);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-bottom:1px solid var(--border);margin-bottom:4px;}
+.message-action-btn{width:100%;border:none;background:#fff;color:var(--text);padding:13px 12px;border-radius:10px;text-align:left;font-size:15px;font-weight:700;cursor:pointer;}
+.message-action-btn:active{background:var(--surface2);}
+.message-action-btn.delete{color:var(--accent);}
+.message-edit-dialog{display:none;position:fixed;inset:0;background:rgba(36,33,30,.32);z-index:2210;align-items:center;justify-content:center;padding:20px;}
+.message-edit-dialog.show{display:flex;}
+.message-edit-card{width:min(460px,100%);background:#fff;border:1px solid var(--border);border-radius:16px;padding:16px;box-shadow:0 18px 50px rgba(36,33,30,.22);}
+.message-edit-title{font-size:16px;font-weight:800;margin-bottom:12px;}
+.message-edit-text{width:100%;min-height:120px;resize:vertical;border:1px solid var(--border);border-radius:10px;padding:12px;font:14px/1.6 'Noto Sans KR',sans-serif;color:var(--text);outline:none;}
+.message-edit-text:focus{border-color:var(--green);}
+.message-edit-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:12px;}
+.message-edit-actions button{border:1px solid var(--border);border-radius:8px;padding:9px 16px;background:#fff;font-size:13px;font-weight:700;cursor:pointer;}
+.message-edit-actions .save{background:var(--green);border-color:var(--green);color:#fff;}
 .chat-msg-parsed{margin-top:8px;padding-top:8px;border-top:1px solid rgba(36,33,30,.1);font-size:11px;}
 .chat-parsed-info{color:var(--text-dim);line-height:1.6;}
 .chat-parsed-info b{color:var(--text);}
@@ -546,12 +562,32 @@ tbody td{padding:15px 10px;vertical-align:middle;line-height:1.65;}
 </div>
 <div id="popup-overlay" style="display:none;position:fixed;inset:0;z-index:499;" onclick="closePopup()"></div>
 
+<div id="message-action-overlay" class="message-action-overlay" onclick="closeMessageActions()">
+  <div class="message-action-sheet" onclick="event.stopPropagation()">
+    <div id="message-action-preview" class="message-action-preview"></div>
+    <button class="message-action-btn" type="button" onclick="openMessageEdit()">메시지 수정</button>
+    <button class="message-action-btn delete" type="button" onclick="deleteSelectedMessage()">메시지 삭제</button>
+    <button class="message-action-btn" type="button" onclick="closeMessageActions()">취소</button>
+  </div>
+</div>
+
+<div id="message-edit-dialog" class="message-edit-dialog" onclick="closeMessageEdit()">
+  <div class="message-edit-card" onclick="event.stopPropagation()">
+    <div class="message-edit-title">메시지 수정</div>
+    <textarea id="message-edit-text" class="message-edit-text"></textarea>
+    <div class="message-edit-actions">
+      <button type="button" onclick="closeMessageEdit()">취소</button>
+      <button class="save" type="button" onclick="saveMessageEdit()">수정 완료</button>
+    </div>
+  </div>
+</div>
+
 <!-- 예약 입력 플로팅 버튼 (오전/오후 탭에서만) -->
 <button class="fab-add" id="fab-add" onclick="openInputSheet()">+</button>
 
 <script src="./vendor/supabase-2.108.1.min.js"></script>
-<script src="./supabase-config.js?v=18"></script>
-<script src="./supabase-store.js?v=18"></script>
+<script src="./supabase-config.js?v=19"></script>
+<script src="./supabase-store.js?v=19"></script>
 <script>
 // ── 상태 ─────────────────────────────────────────────
 let currentTab='am', currentDateKey=todayKey(), reservations={}, parsed=null;
@@ -1745,6 +1781,99 @@ function tryModifyByReply(replyMsg, replyText){
   return true;
 }
 
+let selectedMessageId=null;
+
+function openMessageActions(msgId){
+  const message=chatMessages.find(item=>String(item.id)===String(msgId));
+  if(!message||!isMyMessage(message)) return;
+  selectedMessageId=message.id;
+  document.getElementById('message-action-preview').textContent=message.text;
+  document.getElementById('message-action-overlay').classList.add('show');
+}
+
+function closeMessageActions(){
+  document.getElementById('message-action-overlay')?.classList.remove('show');
+}
+
+function openMessageEdit(){
+  const message=chatMessages.find(item=>String(item.id)===String(selectedMessageId));
+  if(!message) return;
+  closeMessageActions();
+  const textarea=document.getElementById('message-edit-text');
+  textarea.value=message.text;
+  document.getElementById('message-edit-dialog').classList.add('show');
+  setTimeout(()=>{textarea.focus();textarea.setSelectionRange(textarea.value.length,textarea.value.length);},50);
+}
+
+function closeMessageEdit(){
+  document.getElementById('message-edit-dialog')?.classList.remove('show');
+}
+
+async function updateReservationFromEditedMessage(originalMessage,newText){
+  const linked=findReservationFromMessage(originalMessage);
+  if(!linked) return;
+  const next=parseReservationText(newText);
+  if(next.error) return;
+  if(!confirm(`연결된 예약도 수정할까요?\n\n${linked.res.name} ${displayTime(linked.res.time)} ${displayPeople(linked.res.people)}`)) return;
+
+  const reservation=linked.res;
+  reservations[linked.dateKey][linked.slot]=reservations[linked.dateKey][linked.slot]
+    .filter(item=>String(item.id)!==String(reservation.id));
+  if(!reservations[next.dateKey]) reservations[next.dateKey]={am:[],pm:[]};
+  reservation.time=next.timeLabel;
+  reservation.timeH=next.timeH;
+  reservation.name=next.name;
+  reservation.people=next.people;
+  reservation.memo=next.memo;
+  reservations[next.dateKey][next.slot].push(reservation);
+  reservations[next.dateKey][next.slot].sort((a,b)=>a.time.localeCompare(b.time));
+  try{localStorage.setItem('sangmuok_v2',JSON.stringify(reservations));}catch{}
+  autoSyncPaused=true;
+  await saveToSheet();
+  setTimeout(()=>{autoSyncPaused=false;},10000);
+  const d=new Date(next.dateKey+'T00:00:00');
+  addSystemChat(`✏️ ${d.getMonth()+1}월 ${d.getDate()}일 · ${reservation.name} 예약 수정됨 (예약톡 수정)`);
+  render();
+  renderMap();
+}
+
+async function saveMessageEdit(){
+  const message=chatMessages.find(item=>String(item.id)===String(selectedMessageId));
+  const textarea=document.getElementById('message-edit-text');
+  const newText=textarea.value.trim();
+  if(!message||!isMyMessage(message)) return;
+  if(!newText){showBanner('메시지 내용을 입력하세요');return;}
+  if(newText===message.text){closeMessageEdit();return;}
+
+  const original={...message};
+  const previousText=message.text;
+  message.text=newText;
+  try{localStorage.setItem('sangmuok_chats',JSON.stringify(chatMessages));}catch{}
+  renderChat();
+  closeMessageEdit();
+  try{
+    const saved=await SangmuokDB.updateMessage(message.id,newText);
+    const index=chatMessages.findIndex(item=>String(item.id)===String(message.id));
+    if(index>=0) chatMessages[index]={...chatMessages[index],...saved};
+    try{localStorage.setItem('sangmuok_chats',JSON.stringify(chatMessages));}catch{}
+    await updateReservationFromEditedMessage(original,newText);
+    renderChat();
+    showBanner('메시지를 수정했습니다');
+  }catch(error){
+    console.error(error);
+    message.text=previousText;
+    try{localStorage.setItem('sangmuok_chats',JSON.stringify(chatMessages));}catch{}
+    renderChat();
+    showBanner('메시지 수정에 실패했습니다');
+  }
+}
+
+async function deleteSelectedMessage(){
+  const id=selectedMessageId;
+  closeMessageActions();
+  await askDeleteChat(id);
+}
+
 // 스와이프로 답장
 function attachSwipeReply(){
   const box=document.getElementById('chat-messages');
@@ -1775,17 +1904,27 @@ function attachSwipeReply(){
     // PC: 더블클릭으로 답장
     el.addEventListener('dblclick',()=>startReply(el.getAttribute('data-id')));
 
-    // 본인 메시지 삭제: 길게누르기(모바일) / 우클릭(PC)
+    // 본인 메시지 메뉴: 길게누르기(모바일) / 우클릭(PC)
     if(el.classList.contains('mine')){
       let pressTimer=null;
+      let longPressed=false;
       el.addEventListener('touchstart',()=>{
-        pressTimer=setTimeout(()=>askDeleteChat(el.getAttribute('data-id')),600);
+        longPressed=false;
+        pressTimer=setTimeout(()=>{
+          longPressed=true;
+          dragging=false;
+          el.style.transform='';
+          openMessageActions(el.getAttribute('data-id'));
+        },600);
       },{passive:true});
-      el.addEventListener('touchend',()=>clearTimeout(pressTimer));
+      el.addEventListener('touchend',()=>{
+        clearTimeout(pressTimer);
+        if(longPressed) dragging=false;
+      });
       el.addEventListener('touchmove',()=>clearTimeout(pressTimer));
       el.addEventListener('contextmenu',e=>{
         e.preventDefault();
-        askDeleteChat(el.getAttribute('data-id'));
+        openMessageActions(el.getAttribute('data-id'));
       });
     }
   });
@@ -2314,7 +2453,7 @@ setInterval(autoSync, 5000);
 
 // ── PWA 서비스워커 등록 ───────────────────────────────
 if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('./service-worker.js?v=18').catch(()=>{});
+  navigator.serviceWorker.register('./service-worker.js?v=19').catch(()=>{});
 }
 
 // ── 알림 기능 ─────────────────────────────────────────

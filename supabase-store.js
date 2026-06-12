@@ -362,6 +362,18 @@
     if (error) throw error;
   }
 
+  async function updateMessage(id, text) {
+    if (!currentProfile) throw new Error("로그인이 필요합니다.");
+    const { data, error } = await client
+      .from("messages")
+      .update({ message: text })
+      .eq("id", id)
+      .select()
+      .single();
+    if (error) throw error;
+    return toAppMessage(data);
+  }
+
   async function markRead(messageId) {
     if (!currentProfile || !messageId) return;
     const { error } = await client.from("message_reads").upsert({
@@ -407,6 +419,7 @@
     syncReservations,
     loadMessages,
     saveMessage,
+    updateMessage,
     deleteMessage,
     markRead,
     subscribe,
