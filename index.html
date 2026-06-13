@@ -586,8 +586,8 @@ tbody td{padding:15px 10px;vertical-align:middle;line-height:1.65;}
 <button class="fab-add" id="fab-add" onclick="openInputSheet()">+</button>
 
 <script src="./vendor/supabase-2.108.1.min.js"></script>
-<script src="./supabase-config.js?v=19"></script>
-<script src="./supabase-store.js?v=19"></script>
+<script src="./supabase-config.js?v=20"></script>
+<script src="./supabase-store.js?v=20"></script>
 <script>
 // ── 상태 ─────────────────────────────────────────────
 let currentTab='am', currentDateKey=todayKey(), reservations={}, parsed=null;
@@ -804,7 +804,8 @@ function parseReservationText(raw){
     .replace(/(\d{1,2}\s*시\s*\d{1,2})(명)/g, '$1$2')
     .replace(/(\d{1,2}\s*시)(\d{1,2}\/?\d*명)/g, '$1 $2')
     .replace(/(\d{1,2}:\d{2})(\d{1,2}\/?\d*명)/g, '$1 $2')
-    .replace(/(명)(?=\S)/g, '$1 ');
+    // 인원 표기 뒤에만 공백 추가. 이름의 "명"(김명자)은 건드리지 않는다.
+    .replace(/(\d+(?:[.\/+]\d+)?\s*명)(?=\S)/g, '$1 ');
   const lines=normalized.split(/\n/).map(l=>l.trim()).filter(Boolean);
   // 모든 줄을 공백 기준으로 토큰화 (한 줄에 여러 정보 있어도 분리)
   let workLines = [];
@@ -886,10 +887,18 @@ function parseReservationText(raw){
   const MEMO_KW=/룸|갈비|홀|한테이블|테이블|유아|아기|의자|대기|취소|변경|도착|예정|입금|어른|소인|일반\d|매운\d|번방|예약/;
   if(remainLines.length>=1){
     // 첫 줄이 메모 키워드면 이름이 따로 없을 수 있음 → 이름은 키워드 아닌 첫 줄
-    let nameIdx=remainLines.findIndex(l=>!MEMO_KW.test(l) && !/^\d/.test(l));
+    let nameIdx=remainLines.findIndex(l=>!MEMO_KW.test(l) && (!/^\d/.test(l)||/^\d+회$/.test(l)));
     if(nameIdx<0) nameIdx=0;
-    name=remainLines[nameIdx];
-    memo=remainLines.filter((_,i)=>i!==nameIdx);
+    const nameIndexes=[nameIdx];
+    // "김명 자", "금북 21회"처럼 이름이 띄어 입력된 경우 이름으로 합친다.
+    for(let i=nameIdx+1;i<remainLines.length;i++){
+      const part=remainLines[i];
+      if(MEMO_KW.test(part)) break;
+      if(/^[가-힣]$/.test(part)||/^\d+회$/.test(part)) nameIndexes.push(i);
+      else break;
+    }
+    name=nameIndexes.map(i=>remainLines[i]).join('');
+    memo=remainLines.filter((_,i)=>!nameIndexes.includes(i));
   }
   const errors=[];
   if(!timeStr)errors.push('시간');
@@ -2453,7 +2462,7 @@ setInterval(autoSync, 5000);
 
 // ── PWA 서비스워커 등록 ───────────────────────────────
 if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('./service-worker.js?v=19').catch(()=>{});
+  navigator.serviceWorker.register('./service-worker.js?v=20').catch(()=>{});
 }
 
 // ── 알림 기능 ─────────────────────────────────────────
