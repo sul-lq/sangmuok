@@ -586,8 +586,8 @@ tbody td{padding:15px 10px;vertical-align:middle;line-height:1.65;}
 <button class="fab-add" id="fab-add" onclick="openInputSheet()">+</button>
 
 <script src="./vendor/supabase-2.108.1.min.js"></script>
-<script src="./supabase-config.js?v=20"></script>
-<script src="./supabase-store.js?v=20"></script>
+<script src="./supabase-config.js?v=21"></script>
+<script src="./supabase-store.js?v=21"></script>
 <script>
 // ── 상태 ─────────────────────────────────────────────
 let currentTab='am', currentDateKey=todayKey(), reservations={}, parsed=null;
@@ -1054,15 +1054,27 @@ function assignedTableNumbers(tableVal){
     (ROOM_MAP[roomName]||[]).forEach(number=>assigned.add(number));
   };
 
-  // "2층 5,6룸", "2층 5룸 2층 6룸"은 2층 룸으로 먼저 처리한다.
-  text=text.replace(/2\s*층\s*([5-7](?:\s*[,·/+&]\s*[5-7])*)\s*룸/g,(_,rooms)=>{
-    rooms.split(/\s*[,·/+&]\s*/).forEach(room=>addRoom(`2층${room}룸`));
+  function expandRoomNumbers(value){
+    const range=value.match(/^([1-8])\s*[-~]\s*([1-8])$/);
+    if(!range) return value.split(/\s*[,·/+&]\s*/);
+    const start=Number(range[1]),end=Number(range[2]),step=start<=end?1:-1;
+    const rooms=[];
+    for(let room=start;;room+=step){
+      rooms.push(String(room));
+      if(room===end) break;
+    }
+    return rooms;
+  }
+
+  // "2층 5-6룸", "2층 5,6룸", "2층 5룸 2층 6룸"을 먼저 처리한다.
+  text=text.replace(/2\s*층\s*([5-7](?:\s*[-~,·/+&]\s*[5-7])*)\s*룸/g,(_,rooms)=>{
+    expandRoomNumbers(rooms).forEach(room=>addRoom(`2층${room}룸`));
     return ' ';
   });
 
-  // "5,6룸", "5룸 6룸"처럼 여러 룸을 한 예약에 배정할 수 있다.
-  text=text.replace(/([1-8](?:\s*[,·/+&]\s*[1-8])*)\s*룸/g,(_,rooms)=>{
-    rooms.split(/\s*[,·/+&]\s*/).forEach(room=>addRoom(`${room}룸`));
+  // "1-2룸", "5,6룸", "5룸 6룸"처럼 여러 룸을 한 예약에 배정할 수 있다.
+  text=text.replace(/([1-8](?:\s*[-~,·/+&]\s*[1-8])*)\s*룸/g,(_,rooms)=>{
+    expandRoomNumbers(rooms).forEach(room=>addRoom(`${room}룸`));
     return ' ';
   });
 
@@ -2462,7 +2474,7 @@ setInterval(autoSync, 5000);
 
 // ── PWA 서비스워커 등록 ───────────────────────────────
 if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('./service-worker.js?v=20').catch(()=>{});
+  navigator.serviceWorker.register('./service-worker.js?v=21').catch(()=>{});
 }
 
 // ── 알림 기능 ─────────────────────────────────────────
