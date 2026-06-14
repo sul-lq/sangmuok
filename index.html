@@ -593,8 +593,8 @@ tbody td{padding:15px 10px;vertical-align:middle;line-height:1.65;}
 <button class="fab-add" id="fab-add" onclick="openInputSheet()">+</button>
 
 <script src="./vendor/supabase-2.108.1.min.js"></script>
-<script src="./supabase-config.js?v=22"></script>
-<script src="./supabase-store.js?v=22"></script>
+<script src="./supabase-config.js?v=23"></script>
+<script src="./supabase-store.js?v=23"></script>
 <script>
 // ── 상태 ─────────────────────────────────────────────
 let currentTab='am', currentDateKey=todayKey(), reservations={}, parsed=null;
@@ -1780,13 +1780,50 @@ function findReservationFromMessage(msg){
 }
 
 // 답장 텍스트에서 변경 내용 분석
+function parseReplyDate(text){
+  const normalized=normalizeReservationTypos(text);
+  const today=new Date(todayKey()+'T00:00:00');
+  let target=null;
+
+  if(/(?:^|\s)오늘(?:로|으로)?(?:\s|$)/.test(normalized)){
+    target=new Date(today);
+  }else if(/(?:^|\s)(?:내일|낼)(?:로|으로)?(?:\s|$)/.test(normalized)){
+    target=new Date(today);
+    target.setDate(target.getDate()+1);
+  }else if(/(?:^|\s)모레(?:로|으로)?(?:\s|$)/.test(normalized)){
+    target=new Date(today);
+    target.setDate(target.getDate()+2);
+  }else{
+    const monthDay=normalized.match(/(?:^|\s)(\d{1,2})\s*(?:월|\/)\s*(\d{1,2})\s*일?(?:로|으로)?(?:\s|$)/);
+    if(monthDay){
+      let year=today.getFullYear();
+      const month=Number(monthDay[1]),day=Number(monthDay[2]);
+      target=new Date(year,month-1,day);
+      if(target<today) target=new Date(year+1,month-1,day);
+      if(target.getMonth()!==month-1||target.getDate()!==day) target=null;
+    }else{
+      const dayOnly=normalized.match(/(?:^|\s)(\d{1,2})\s*일(?:로|으로)?(?:\s|$)/);
+      if(dayOnly){
+        const day=Number(dayOnly[1]);
+        target=new Date(today.getFullYear(),today.getMonth(),day);
+        if(target<today) target=new Date(today.getFullYear(),today.getMonth()+1,day);
+        if(target.getDate()!==day) target=null;
+      }
+    }
+  }
+  if(!target||Number.isNaN(target.getTime())) return null;
+  return `${target.getFullYear()}-${pad(target.getMonth()+1)}-${pad(target.getDate())}`;
+}
+
 function analyzeChange(text){
   const t=text.trim();
   const changes={};
   // 취소
   if(/취소|캔슬|노쇼|안와|안 와|안옴/.test(t)){ changes.cancel=true; return changes; }
+  const changedDate=parseReplyDate(t);
+  if(changedDate) changes.date=changedDate;
   // 시간 변경
-  const timeMatch=t.match(/(\d{1,2}\s*시\s*\d{0,2}\s*분?|\d{1,2}:\d{2}|\d{1,2}\s*시\s*반?)/);
+  const timeMatch=t.match(/(\d{1,2}\s*시\s*\d{1,2}\s*분|\d{1,2}\s*시\s*반|\d{1,2}:\d{2}|\d{1,2}\s*시)/);
   if(timeMatch && /변경|으로|로|바꿔|수정/.test(t)){
     const to=parseTimeStr(timeMatch[1].replace(/\s/g,''));
     if(to && to.h>=11 && to.h<22){ changes.time={h:to.h,m:to.m}; }
@@ -1843,6 +1880,12 @@ function tryModifyByReply(replyMsg, replyText){
 
   // 변경 요약
   let summary=[], applied={};
+  if(changes.date){
+    const before=new Date(dateKey+'T00:00:00');
+    const after=new Date(changes.date+'T00:00:00');
+    summary.push(`날짜 ${before.getMonth()+1}/${before.getDate()} → ${after.getMonth()+1}/${after.getDate()}`);
+    applied.date=changes.date;
+  }
   if(changes.time){
     const newLabel=`${pad(changes.time.h)}:${pad(changes.time.m)}`;
     summary.push(`시간 ${res.time} → ${newLabel}`);
@@ -1859,21 +1902,22 @@ function tryModifyByReply(replyMsg, replyText){
   if(summary.length===0) return false;
 
   if(confirm(`예약을 수정할까요?\n\n${res.name}\n${summary.join('\n')}`)){
-    if(applied.time){ res.time=applied.time; res.timeH=applied.timeH;
-      // 시간대(오전/오후) 바뀌면 이동
-      if(applied.newSlot!==slot){
-        reservations[dateKey][slot]=reservations[dateKey][slot].filter(x=>String(x.id)!==String(res.id));
-        if(!reservations[dateKey][applied.newSlot])reservations[dateKey][applied.newSlot]=[];
-        reservations[dateKey][applied.newSlot].push(res);
-      }
-    }
+    const targetDate=applied.date||dateKey;
+    const targetSlot=applied.newSlot||slot;
+    if(applied.time){ res.time=applied.time; res.timeH=applied.timeH; }
     if(applied.people!==undefined) res.people=applied.people;
     if(applied.table!==undefined) res.table=applied.table;
+    if(targetDate!==dateKey||targetSlot!==slot){
+      reservations[dateKey][slot]=reservations[dateKey][slot].filter(x=>String(x.id)!==String(res.id));
+      if(!reservations[targetDate]) reservations[targetDate]={am:[],pm:[]};
+      reservations[targetDate][targetSlot].push(res);
+      reservations[targetDate][targetSlot].sort((a,b)=>a.time.localeCompare(b.time));
+    }
     try{localStorage.setItem('sangmuok_v2',JSON.stringify(reservations));}catch{}
     autoSyncPaused=true;
     saveToSheet();
     setTimeout(()=>{autoSyncPaused=false;},10000);
-    const d=new Date(dateKey+'T00:00:00');
+    const d=new Date(targetDate+'T00:00:00');
     const editMsg={id:Date.now(),time:new Date().toISOString(),sender:'시스템',
       system:true,
       text:`✏️ ${d.getMonth()+1}월 ${d.getDate()}일 · ${res.name} 수정: ${summary.join(', ')}`};
@@ -2558,7 +2602,7 @@ setInterval(autoSync, 5000);
 
 // ── PWA 서비스워커 등록 ───────────────────────────────
 if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('./service-worker.js?v=22').catch(()=>{});
+  navigator.serviceWorker.register('./service-worker.js?v=23').catch(()=>{});
 }
 
 // ── 알림 기능 ─────────────────────────────────────────

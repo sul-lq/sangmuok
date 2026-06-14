@@ -1,5 +1,5 @@
 // 상무옥 예약관리 Service Worker
-const CACHE_NAME = 'sangmuok-v22';
+const CACHE_NAME = 'sangmuok-v23';
 const ASSETS = [
   './index.html',
   './manifest.json',
