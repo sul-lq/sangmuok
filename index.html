@@ -107,6 +107,7 @@ header{padding:12px 20px;border-bottom:1px solid var(--border);display:flex;alig
 .chat-msg-parsed{margin-top:8px;padding-top:8px;border-top:1px solid rgba(36,33,30,.1);font-size:11px;}
 .chat-parsed-info{color:var(--text-dim);line-height:1.6;}
 .chat-parsed-info b{color:var(--text);}
+.chat-parse-warning{color:var(--accent);font-size:12px;margin-top:4px;}
 .chat-register-btn{margin-top:6px;background:var(--green);color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;width:100%;font-family:'Noto Sans KR',sans-serif;}
 .chat-register-btn.done{background:var(--surface);color:var(--text-dim);cursor:default;}
 .chat-input-bar{
@@ -599,8 +600,8 @@ tbody td{padding:15px 10px;vertical-align:middle;line-height:1.65;}
 <button class="fab-add" id="fab-add" onclick="openInputSheet()">+</button>
 
 <script src="./vendor/supabase-2.108.1.min.js"></script>
-<script src="./supabase-config.js?v=24"></script>
-<script src="./supabase-store.js?v=24"></script>
+<script src="./supabase-config.js?v=25"></script>
+<script src="./supabase-store.js?v=25"></script>
 <script>
 // ── 상태 ─────────────────────────────────────────────
 let currentTab='am', currentDateKey=todayKey(), reservations={}, parsed=null;
@@ -804,11 +805,8 @@ function parseTimeStr(str){
   if(!am&&!pm&&h>=1&&h<=9)h+=12;
   return{h,m};
 }
-// 텍스트 → 예약 객체 파싱 (성공시 객체, 실패시 {error})
-function parseReservationText(raw){
-  if(!raw||!raw.trim()) return {error:'빈 입력'};
+function tokenizeReservationInput(raw){
   let normalized = normalizeReservationTypos(raw);
-  // 붙어있는 토큰 분리
   normalized = normalized
     .replace(/(\d{1,2})월\s+(\d{1,2})일/g, '$1/$2')
     .replace(/(오전|오후)\s+(\d{1,2}\s*(?:시|:\d{2}))/g, '$1$2')
@@ -819,12 +817,39 @@ function parseReservationText(raw){
     .replace(/(\d{1,2}:\d{2})(\d{1,2}\/?\d*명)/g, '$1 $2')
     // 인원 표기 뒤에만 공백 추가. 이름의 "명"(김명자)은 건드리지 않는다.
     .replace(/(\d+(?:[.\/+]\d+)?\s*명)(?=\S)/g, '$1 ');
-  const lines=normalized.split(/\n/).map(l=>l.trim()).filter(Boolean);
-  // 모든 줄을 공백 기준으로 토큰화 (한 줄에 여러 정보 있어도 분리)
-  let workLines = [];
-  lines.forEach(l=>{
-    l.split(/\s+/).filter(Boolean).forEach(tok=>workLines.push(tok));
-  });
+  return normalized
+    .split(/\n/)
+    .map(line=>line.trim())
+    .filter(Boolean)
+    .flatMap(line=>line.split(/\s+/).filter(Boolean));
+}
+
+const RESERVATION_MEMO_KW=/룸|갈비|홀|한테이블|테이블|유아|아기|의자|대기|취소|변경|도착|예정|입금|어른|소인|일반\d|매운\d|번방|예약/;
+
+function classifyReservationNameMemo(remainLines){
+  if(!remainLines.length) return {name:null,memo:[]};
+  let nameIdx=remainLines.findIndex(line=>
+    !RESERVATION_MEMO_KW.test(line) &&
+    (!/^\d/.test(line)||/^\d+회$/.test(line))
+  );
+  if(nameIdx<0) nameIdx=0;
+  const nameIndexes=[nameIdx];
+  for(let i=nameIdx+1;i<remainLines.length;i++){
+    const part=remainLines[i];
+    if(RESERVATION_MEMO_KW.test(part)) break;
+    if(/^[가-힣]$/.test(part)||/^\d+회$/.test(part)) nameIndexes.push(i);
+    else break;
+  }
+  return {
+    name:nameIndexes.map(index=>remainLines[index]).join(''),
+    memo:remainLines.filter((_,index)=>!nameIndexes.includes(index))
+  };
+}
+
+// 텍스트 → 예약 객체 파싱 (성공시 객체, 실패시 {error})
+function parseReservationText(raw){
+  if(!raw||!raw.trim()) return {error:'빈 입력'};
+  const workLines=tokenizeReservationInput(raw);
   let dateKey=currentDateKey,timeStr=null,name=null,people=null,memo=[],dateExplicit=false,statedDow=null;
   const remainLines=[];
   const TODAY = todayKey(); // 실제 오늘 (보고 있는 날짜 아님)
@@ -895,24 +920,7 @@ function parseReservationText(raw){
       return {error:`날짜·요일 불일치 (${selectedDate.getMonth()+1}/${selectedDate.getDate()}은 ${dayNames[selectedDate.getDay()]}요일)`};
     }
   }
-  // remainLines에서 메모성 단어와 이름 분리
-  // 메모 키워드: 룸, 갈비, 홀, 한테이블, 유아의자, 대기, 취소, 변경, 도착 등
-  const MEMO_KW=/룸|갈비|홀|한테이블|테이블|유아|아기|의자|대기|취소|변경|도착|예정|입금|어른|소인|일반\d|매운\d|번방|예약/;
-  if(remainLines.length>=1){
-    // 첫 줄이 메모 키워드면 이름이 따로 없을 수 있음 → 이름은 키워드 아닌 첫 줄
-    let nameIdx=remainLines.findIndex(l=>!MEMO_KW.test(l) && (!/^\d/.test(l)||/^\d+회$/.test(l)));
-    if(nameIdx<0) nameIdx=0;
-    const nameIndexes=[nameIdx];
-    // "김명 자", "금북 21회"처럼 이름이 띄어 입력된 경우 이름으로 합친다.
-    for(let i=nameIdx+1;i<remainLines.length;i++){
-      const part=remainLines[i];
-      if(MEMO_KW.test(part)) break;
-      if(/^[가-힣]$/.test(part)||/^\d+회$/.test(part)) nameIndexes.push(i);
-      else break;
-    }
-    name=nameIndexes.map(i=>remainLines[i]).join('');
-    memo=remainLines.filter((_,i)=>!nameIndexes.includes(i));
-  }
+  ({name,memo}=classifyReservationNameMemo(remainLines));
   const errors=[];
   if(!timeStr)errors.push('시간');
   if(!name)errors.push('예약자명');
@@ -924,7 +932,13 @@ function parseReservationText(raw){
   const meridiem=timeObj.h>=12?'오후':'오전';
   const memoText=memo.join(' ');
   const table=extractTableAssignment(memoText);
-  return {dateKey,timeLabel,timeH:timeObj.h,meridiem,name,people:people||'',memo:memoText,table,slot};
+  const warnings=[];
+  if(!people) warnings.push('인원 확인 필요');
+  if(name.length<2||RESERVATION_MEMO_KW.test(name)) warnings.push('예약자명 확인 필요');
+  return {
+    dateKey,timeLabel,timeH:timeObj.h,meridiem,name,people:people||'',memo:memoText,table,slot,
+    warnings,needsConfirmation:warnings.length>0
+  };
 }
 
 function parseInput(){
@@ -941,14 +955,43 @@ function parseInput(){
     <div class="pv-row"><span class="pv-label">예약자</span><span class="pv-val">${escapeHtml(result.name)}</span></div>
     <div class="pv-row"><span class="pv-label">인원</span><span class="pv-val">${escapeHtml(result.people||'-')}명</span></div>
     ${result.table?`<div class="pv-row"><span class="pv-label">테이블</span><span class="pv-val">${escapeHtml(result.table)}</span></div>`:''}
-    ${result.memo?`<div class="pv-row"><span class="pv-label">메모</span><span class="pv-val">${escapeHtml(result.memo)}</span></div>`:''}`;
+    ${result.memo?`<div class="pv-row"><span class="pv-label">메모</span><span class="pv-val">${escapeHtml(result.memo)}</span></div>`:''}
+    ${result.needsConfirmation?`<div class="preview-error">확인: ${escapeHtml(result.warnings.join(' · '))}</div>`:''}`;
   parsed=result;
   btn.disabled=false;
 }
 
 // ── 예약 추가/삭제 ────────────────────────────────────
+function normalizeReservationName(value){
+  return String(value||'')
+    .normalize('NFKC')
+    .toLowerCase()
+    .replace(/\s+/g,'')
+    .replace(/[^\p{L}\p{N}]/gu,'');
+}
+
+function findDuplicateReservation(candidate,excludeId=null){
+  const list=(reservations[candidate.dateKey]||{})[candidate.slot]||[];
+  const candidateName=normalizeReservationName(candidate.name);
+  return list.find(reservation=>
+    String(reservation.id)!==String(excludeId) &&
+    reservation.time===candidate.timeLabel &&
+    normalizeReservationName(reservation.name)===candidateName
+  )||null;
+}
+
+function duplicateReservationMessage(duplicate,candidate){
+  const date=new Date(candidate.dateKey+'T00:00:00');
+  return `${date.getMonth()+1}/${date.getDate()} ${displayTime(candidate.timeLabel)} ${duplicate.name} 예약이 이미 있습니다`;
+}
+
 function addReservation(){
   if(!parsed)return;
+  const duplicate=findDuplicateReservation(parsed);
+  if(duplicate){
+    showBanner(duplicateReservationMessage(duplicate,parsed));
+    return;
+  }
   const key=parsed.dateKey;
   if(!reservations[key])reservations[key]={am:[],pm:[]};
   reservations[key][parsed.slot].push({id:Date.now(),time:parsed.timeLabel,timeH:parsed.timeH,name:parsed.name,people:parsed.people,memo:parsed.memo,table:parsed.table||''});
@@ -1045,6 +1088,7 @@ function updateReservationField(dateKey,slot,id,field,value){
 
   let targetDate=dateKey;
   let targetSlot=slot;
+  const next={...reservation};
   if(field==='date'){
     if(!/^\d{4}-\d{2}-\d{2}$/.test(value)) return;
     targetDate=value;
@@ -1055,18 +1099,34 @@ function updateReservationField(dateKey,slot,id,field,value){
       render();
       return;
     }
-    reservation.time=`${pad(parsedTime.h)}:${pad(parsedTime.m)}`;
-    reservation.timeH=parsedTime.h;
+    next.time=`${pad(parsedTime.h)}:${pad(parsedTime.m)}`;
+    next.timeH=parsedTime.h;
     targetSlot=parsedTime.h<16?'am':'pm';
   }else if(field==='name'){
     if(!value.trim()){showBanner('예약자명을 입력하세요');render();return;}
-    reservation.name=value.trim();
+    next.name=value.trim();
   }else if(field==='people'){
-    reservation.people=String(value||'').replace(/명/g,'').replace(/[.+]/g,'/').replace(/\s+/g,'');
+    next.people=String(value||'').replace(/명/g,'').replace(/[.+]/g,'/').replace(/\s+/g,'');
   }else if(field==='memo'){
-    reservation.memo=value.trim();
+    next.memo=value.trim();
   }
 
+  const duplicate=findDuplicateReservation({
+    dateKey:targetDate,
+    slot:targetSlot,
+    timeLabel:next.time,
+    name:next.name
+  },reservation.id);
+  if(duplicate){
+    showBanner(duplicateReservationMessage(duplicate,{
+      dateKey:targetDate,
+      timeLabel:next.time
+    }));
+    render();
+    return;
+  }
+
+  Object.assign(reservation,next);
   if(targetDate!==dateKey||targetSlot!==slot){
     reservations[dateKey][slot]=source.filter(item=>String(item.id)!==String(id));
     if(!reservations[targetDate]) reservations[targetDate]={am:[],pm:[]};
@@ -1962,9 +2022,23 @@ function tryModifyByReply(replyMsg, replyText){
 
   if(summary.length===0) return false;
 
+  const targetDate=applied.date||dateKey;
+  const targetSlot=applied.newSlot||slot;
+  const duplicate=findDuplicateReservation({
+    dateKey:targetDate,
+    slot:targetSlot,
+    timeLabel:applied.time||res.time,
+    name:res.name
+  },res.id);
+  if(duplicate){
+    showBanner(duplicateReservationMessage(duplicate,{
+      dateKey:targetDate,
+      timeLabel:applied.time||res.time
+    }));
+    return true;
+  }
+
   if(confirm(`예약을 수정할까요?\n\n${res.name}\n${summary.join('\n')}`)){
-    const targetDate=applied.date||dateKey;
-    const targetSlot=applied.newSlot||slot;
     if(applied.time){ res.time=applied.time; res.timeH=applied.timeH; }
     if(applied.people!==undefined) res.people=applied.people;
     if(applied.table!==undefined) res.table=applied.table;
@@ -2022,6 +2096,11 @@ async function updateReservationFromEditedMessage(originalMessage,newText){
   if(!linked) return;
   const next=parseReservationText(newText);
   if(next.error) return;
+  const duplicate=findDuplicateReservation(next,linked.res.id);
+  if(duplicate){
+    showBanner(duplicateReservationMessage(duplicate,next));
+    return;
+  }
   if(!confirm(`연결된 예약도 수정할까요?\n\n${linked.res.name} ${displayTime(linked.res.time)} ${displayPeople(linked.res.people)}`)) return;
 
   const reservation=linked.res;
@@ -2219,12 +2298,23 @@ async function sendChat(){
   const result=parseReservationText(text);
   if(!result.error){
     const auto=document.getElementById('auto-register').checked;
-    if(auto){ doRegisterFromChat(msg.id,result); }
+    if(auto&&!result.needsConfirmation){
+      doRegisterFromChat(msg.id,result);
+    }else if(auto&&result.needsConfirmation){
+      showBanner(`예약 정보 확인: ${result.warnings.join(' · ')}`);
+    }
   }
 }
 
 function doRegisterFromChat(msgId,result){
   if(registeredMsgIds.has(msgId)) return;
+  const duplicate=findDuplicateReservation(result);
+  if(duplicate){
+    registeredMsgIds.add(msgId);
+    showBanner(duplicateReservationMessage(duplicate,result));
+    renderChat();
+    return;
+  }
   const key=result.dateKey;
   if(!reservations[key])reservations[key]={am:[],pm:[]};
   reservations[key][result.slot].push({id:Date.now()+Math.random(),time:result.timeLabel,timeH:result.timeH,name:result.name,people:result.people,memo:result.memo,table:result.table||''});
@@ -2274,16 +2364,17 @@ function renderChat(){
     }
     const timeStr=`${pad(d.getHours())}:${pad(d.getMinutes())}`;
     const mine=isMyMessage(m);
-    const result=parseReservationText(m.text);
+    const result=m.system?{error:'시스템 메시지'}:parseReservationText(m.text);
     let parsedHtml='';
     if(!result.error){
       const rd=new Date(result.dateKey+'T00:00:00');
       const registered = registeredMsgIds.has(m.id) || isAlreadyReserved(result);
       parsedHtml=`<div class="chat-msg-parsed">
         <div class="chat-parsed-info">📋 <b>${rd.getMonth()+1}/${rd.getDate()}</b> ${escapeHtml(displayTime(result.timeLabel))} · <b><u>${escapeHtml(result.name)}</u></b> <b>${escapeHtml(displayPeople(result.people))}</b> ${result.table?'· <b>'+escapeHtml(result.table)+'</b>':''} ${result.memo?'· '+escapeHtml(result.memo):''}</div>
+        ${result.needsConfirmation?`<div class="chat-parse-warning">확인: ${escapeHtml(result.warnings.join(' · '))}</div>`:''}
         ${registered
           ? `<button class="chat-register-btn done">✓ 등록됨</button>`
-          : `<button class="chat-register-btn" onclick='doRegisterFromChatById(${m.id})'>예약 등록</button>`}
+          : `<button class="chat-register-btn" onclick='doRegisterFromChatById(${m.id})'>${result.needsConfirmation?'확인 후 예약 등록':'예약 등록'}</button>`}
       </div>`;
     }
     // 검색어 하이라이트
@@ -2338,14 +2429,9 @@ function doRegisterFromChatById(msgId){
   doRegisterFromChat(msgId,result);
 }
 
-// 같은 예약이 이미 등록돼 있는지 확인 (날짜+시간+이름+인원 일치)
+// 같은 예약이 이미 등록돼 있는지 확인 (날짜+시간+예약자명 일치)
 function isAlreadyReserved(result){
-  const list=(reservations[result.dateKey]||{})[result.slot]||[];
-  return list.some(r=>
-    r.time===result.timeLabel &&
-    r.name===result.name &&
-    String(r.people)===String(result.people)
-  );
+  return Boolean(findDuplicateReservation(result));
 }
 
 function escapeHtml(s){

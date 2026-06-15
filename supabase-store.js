@@ -277,6 +277,9 @@
           .insert(payload)
           .select()
           .single();
+        if (error?.code === "23505") {
+          throw new Error("같은 날짜·시간·예약자의 예약이 이미 있습니다.");
+        }
         if (error) throw error;
         item.reservation.id = Number(data.id);
         reservationBaseline.set(Number(data.id), comparable(data));
@@ -296,6 +299,9 @@
         .eq("id", id)
         .select()
         .single();
+      if (error?.code === "23505") {
+        throw new Error("같은 날짜·시간·예약자의 예약이 이미 있습니다.");
+      }
       if (error) throw error;
       reservationBaseline.set(id, comparable(data));
     }
