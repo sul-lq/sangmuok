@@ -280,6 +280,12 @@ tbody td{padding:15px 10px;vertical-align:middle;line-height:1.65;}
 .summary-bar{display:flex;gap:16px;margin-bottom:12px;padding:8px 12px;background:var(--surface);border-radius:8px;border:1px solid var(--border);font-size:12px;}
 .summary-bar span{color:var(--text-dim);}
 .summary-bar strong{color:var(--text);font-family:'DM Mono',monospace;}
+.reservation-actions{margin-left:auto;display:flex;align-items:center;gap:8px;}
+.reservation-select-all{display:flex;align-items:center;gap:5px;font-size:12px;font-weight:700;color:var(--text-dim);cursor:pointer;}
+.reservation-checkbox{width:18px;height:18px;accent-color:var(--green);cursor:pointer;}
+.reservation-delete-selected{border:1px solid #d7b8b3;border-radius:7px;background:#fff;color:var(--accent);padding:6px 10px;font-size:12px;font-weight:800;cursor:pointer;}
+.reservation-delete-selected:disabled{opacity:.4;cursor:not-allowed;}
+.reservation-row-selected{background:#f3eee9;}
 .td-table-input{background:#fff;border:1px solid #d8d1c9;border-radius:7px;color:var(--text);font-family:'Noto Sans KR',sans-serif;font-size:13px;font-weight:700;width:100%;min-width:92px;padding:7px 8px;outline:none;}
 .td-table-input:focus{border-bottom-color:#81776e;color:var(--text);}
 .td-edit-input{width:100%;min-width:78px;background:#fff;border:1px solid #d8d1c9;border-radius:7px;color:var(--text);padding:7px 8px;font:700 14px/1.3 'Noto Sans KR',sans-serif;outline:none;}
@@ -593,8 +599,8 @@ tbody td{padding:15px 10px;vertical-align:middle;line-height:1.65;}
 <button class="fab-add" id="fab-add" onclick="openInputSheet()">+</button>
 
 <script src="./vendor/supabase-2.108.1.min.js"></script>
-<script src="./supabase-config.js?v=23"></script>
-<script src="./supabase-store.js?v=23"></script>
+<script src="./supabase-config.js?v=24"></script>
+<script src="./supabase-store.js?v=24"></script>
 <script>
 // ── 상태 ─────────────────────────────────────────────
 let currentTab='am', currentDateKey=todayKey(), reservations={}, parsed=null;
@@ -979,6 +985,54 @@ function deleteRow(dateKey,slot,id){
   saveToSheet();
   setTimeout(()=>{autoSyncPaused=false;},10000);
 }
+
+function toggleAllReservations(checked){
+  document.querySelectorAll('.reservation-row-check').forEach(input=>{
+    input.checked=checked;
+    input.closest('tr')?.classList.toggle('reservation-row-selected',checked);
+  });
+  updateReservationSelection();
+}
+
+function updateReservationSelection(){
+  const checks=[...document.querySelectorAll('.reservation-row-check')];
+  const selected=checks.filter(input=>input.checked);
+  checks.forEach(input=>input.closest('tr')?.classList.toggle('reservation-row-selected',input.checked));
+  const all=document.getElementById('reservation-select-all');
+  if(all){
+    all.checked=checks.length>0&&selected.length===checks.length;
+    all.indeterminate=selected.length>0&&selected.length<checks.length;
+  }
+  const button=document.getElementById('reservation-delete-selected');
+  if(button){
+    button.disabled=selected.length===0;
+    button.textContent=selected.length?`선택삭제 (${selected.length})`:'선택삭제';
+  }
+}
+
+function deleteSelectedReservations(dateKey,slot){
+  const ids=[...document.querySelectorAll('.reservation-row-check:checked')].map(input=>String(input.value));
+  if(!ids.length) return;
+  const list=reservations[dateKey]?.[slot]||[];
+  const selected=list.filter(reservation=>ids.includes(String(reservation.id)));
+  if(!selected.length) return;
+  if(!confirm(`선택한 예약 ${selected.length}건을 삭제할까요?`)) return;
+
+  reservations[dateKey][slot]=list.filter(reservation=>!ids.includes(String(reservation.id)));
+  try{localStorage.setItem('sangmuok_v2',JSON.stringify(reservations));}catch{}
+  const d=new Date(dateKey+'T00:00:00');
+  const details=selected
+    .map(reservation=>`${reservation.name} ${displayTime(reservation.time)} ${displayPeople(reservation.people)}`)
+    .join('\n');
+  addSystemChat(`❌ ${d.getMonth()+1}월 ${d.getDate()}일 · 예약 ${selected.length}건 취소됨 (예약지 선택삭제)\n${details}`);
+  autoSyncPaused=true;
+  saveToSheet();
+  setTimeout(()=>{autoSyncPaused=false;},10000);
+  render();
+  renderMap();
+  showBanner(`예약 ${selected.length}건을 삭제했습니다`);
+}
+
 function updateTable(dateKey,slot,id,val){
   const r=reservations[dateKey]?.[slot]?.find(r=>String(r.id)===String(id));
   if(r){r.table=val;saveToSheet();showCapacityRisk(dateKey,slot);renderMap();}
@@ -1511,6 +1565,7 @@ function render(){
     return;
   }
   const rows=list.map(r=>`<tr>
+    <td><input class="reservation-checkbox reservation-row-check" type="checkbox" value="${r.id}" aria-label="${escapeHtml(r.name)} 예약 선택" onchange="updateReservationSelection()"></td>
     <td><input class="td-edit-input td-edit-date" type="date" value="${currentDateKey}" onchange="updateReservationField('${currentDateKey}','${cc}',${r.id},'date',this.value)"></td>
     <td><input class="td-edit-input td-edit-time ${cc}" value="${escapeHtml(displayTime(r.time))}" inputmode="numeric" onchange="updateReservationField('${currentDateKey}','${cc}',${r.id},'time',this.value)"></td>
     <td><input class="td-edit-input td-edit-name" value="${escapeHtml(r.name)}" onchange="updateReservationField('${currentDateKey}','${cc}',${r.id},'name',this.value)"></td>
@@ -1520,9 +1575,15 @@ function render(){
     <td><button class="btn-del" onclick="deleteRow('${currentDateKey}','${cc}',${r.id})">✕</button></td>
   </tr>`).join('');
   panel.innerHTML=`
-    <div class="section-header"><div class="section-dot ${cc}"></div><div class="section-title ${cc}">${slotLabel}</div><span class="section-count">${list.length}건</span></div>
+    <div class="section-header">
+      <div class="section-dot ${cc}"></div><div class="section-title ${cc}">${slotLabel}</div><span class="section-count">${list.length}건</span>
+      <div class="reservation-actions">
+        <label class="reservation-select-all"><input id="reservation-select-all" class="reservation-checkbox" type="checkbox" onchange="toggleAllReservations(this.checked)"> 전체선택</label>
+        <button id="reservation-delete-selected" class="reservation-delete-selected" type="button" onclick="deleteSelectedReservations('${currentDateKey}','${cc}')" disabled>선택삭제</button>
+      </div>
+    </div>
     <div class="summary-bar"><div><span>예약 </span><strong>${list.length}건</strong></div><div><span>총 인원 </span><strong>약 ${totalPeople}명</strong></div></div>
-    <table><thead><tr><th>날짜</th><th>시간</th><th>예약자</th><th>인원</th><th>테이블</th><th>메모</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
+    <table><thead><tr><th>선택</th><th>날짜</th><th>시간</th><th>예약자</th><th>인원</th><th>테이블</th><th>메모</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
 // ── 채팅 (예약톡) ─────────────────────────────────────
@@ -2602,7 +2663,7 @@ setInterval(autoSync, 5000);
 
 // ── PWA 서비스워커 등록 ───────────────────────────────
 if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('./service-worker.js?v=23').catch(()=>{});
+  navigator.serviceWorker.register('./service-worker.js?v=24').catch(()=>{});
 }
 
 // ── 알림 기능 ─────────────────────────────────────────
